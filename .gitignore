@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+dist/
+Engine/age-engine
+.DS_Store
+*.tmp
+*.age
+*.tar
+*.tar.gz

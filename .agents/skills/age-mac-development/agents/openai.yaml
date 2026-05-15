@@ -1,0 +1,4 @@
+name: age-mac-development
+display_name: Age Mac Development
+short_description: Build and extend the standalone Age Mac SwiftUI app and Go age engine.
+default_prompt: Build, run, debug, or extend the Age Mac macOS app.
