@@ -44,8 +44,11 @@ Age Mac is local-first. Files, passphrases, private keys, and operation history 
 When update checking is enabled or triggered, Sparkle reads public update metadata from:
 
 ```text
-https://vikiea.github.io/age_mac/appcast.xml
+https://vikiea.github.io/age_mac/appcast-arm64.xml
+https://vikiea.github.io/age_mac/appcast-x86_64.xml
 ```
+
+The app chooses the matching feed at runtime based on the current Mac architecture.
 
 See [PRIVACY.md](PRIVACY.md) and the hosted privacy page at [vikiea.github.io/age_mac/privacy/](https://vikiea.github.io/age_mac/privacy/).
 
@@ -79,14 +82,15 @@ Use `env -u GOROOT` for Go commands if your shell has a stale `GOROOT` from anot
 
 ## Release And Updates
 
-Age Mac uses Sparkle 2 for online updates. The appcast is hosted from the `docs/` directory by GitHub Pages.
+Age Mac uses Sparkle 2 for online updates. Architecture-specific appcasts are hosted from the `docs/` directory by GitHub Pages.
 
 Key points:
 
 - `SUPublicEDKey` is written into the generated app `Info.plist`.
 - The Sparkle private EdDSA key stays in the local macOS Keychain or another private secret store.
-- Release archives and appcast entries are generated with `scripts/sparkle/release_appcast.sh`.
-- GitHub Pages publishes `docs/appcast.xml`.
+- DMG release assets and appcast entries are generated with `scripts/release/build_dmg_release.sh all`.
+- `scripts/sparkle/release_appcast.sh` is kept as a compatibility wrapper for the same DMG release flow.
+- GitHub Pages publishes `docs/appcast-arm64.xml` and `docs/appcast-x86_64.xml`.
 
 See [COOKBOOK.md](COOKBOOK.md) for detailed build, key, release, and appcast workflows.
 

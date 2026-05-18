@@ -10,7 +10,7 @@ Age Mac is a native macOS app for local age file encryption and decryption.
 
 - Repository: [github.com/vikiea/age_mac](https://github.com/vikiea/age_mac)
 - Privacy policy: [Privacy](privacy/)
-- Appcast: [appcast.xml](appcast.xml)
+- Appcast: [Apple Silicon](appcast-arm64.xml), [Intel](appcast-x86_64.xml)
 - License: [MIT](https://github.com/vikiea/age_mac/blob/main/LICENSE)
 
 Age Mac keeps files, keys, passphrases, and history local to your Mac. Update checks use Sparkle and read public metadata from this GitHub Pages site.

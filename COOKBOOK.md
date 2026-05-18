@@ -89,31 +89,52 @@ By default, Sparkle stores the private key in the macOS Keychain and prints a pu
 
 Never commit a private update signing key. If you export one to a file for CI or release automation, keep it outside the repository or under an ignored private path.
 
-## Release Archive And Appcast
+## DMG Release And Appcast
 
-Build a release archive and refresh the appcast:
+Build DMG release assets and refresh the appcasts:
+
+```bash
+scripts/release/build_dmg_release.sh all
+```
+
+The script:
+
+1. Builds the Swift app for `arm64` and `x86_64`.
+2. Builds the Go engine for `arm64` and `amd64`.
+3. Stages three app bundles under `dist/`: `arm64`, `x86_64`, and `universal`.
+4. Creates three DMGs under `docs/releases/`:
+   - `AgeMac-<version>-arm64.dmg`
+   - `AgeMac-<version>-x86_64.dmg`
+   - `AgeMac-<version>-universal.dmg`
+5. Signs the architecture-specific DMGs for Sparkle.
+6. Writes `docs/appcast-arm64.xml` and `docs/appcast-x86_64.xml`.
+7. Writes `docs/appcast.xml` as a lightweight index feed.
+8. Mounts each DMG, verifies the app signature, and checks the app and engine architecture slices.
+
+The legacy command is still supported and delegates to the same DMG flow:
 
 ```bash
 scripts/sparkle/release_appcast.sh
 ```
 
-The script:
-
-1. Builds `dist/AgeMac.app`.
-2. Creates `docs/releases/AgeMac-<version>.zip`.
-3. Runs Sparkle's `generate_appcast` against `docs/releases`.
-4. Copies the generated feed to `docs/appcast.xml`.
-
-The app reads update metadata from:
+The app chooses the matching Sparkle feed at runtime:
 
 ```text
-https://vikiea.github.io/age_mac/appcast.xml
+https://vikiea.github.io/age_mac/appcast-arm64.xml
+https://vikiea.github.io/age_mac/appcast-x86_64.xml
 ```
 
-Release archives are uploaded as GitHub Release assets. The appcast points to:
+DMGs are uploaded as GitHub Release assets. Appcasts point to:
 
 ```text
-https://github.com/vikiea/age_mac/releases/download/v<version>/AgeMac-<version>.zip
+https://github.com/vikiea/age_mac/releases/download/v<version>/AgeMac-<version>-arm64.dmg
+https://github.com/vikiea/age_mac/releases/download/v<version>/AgeMac-<version>-x86_64.dmg
+```
+
+The universal DMG is uploaded for manual downloads:
+
+```text
+https://github.com/vikiea/age_mac/releases/download/v<version>/AgeMac-<version>-universal.dmg
 ```
 
 ## GitHub Pages
@@ -124,7 +145,9 @@ Public URLs:
 
 - Project page: `https://vikiea.github.io/age_mac/`
 - Privacy policy: `https://vikiea.github.io/age_mac/privacy/`
-- Sparkle appcast: `https://vikiea.github.io/age_mac/appcast.xml`
+- Sparkle arm64 appcast: `https://vikiea.github.io/age_mac/appcast-arm64.xml`
+- Sparkle x86_64 appcast: `https://vikiea.github.io/age_mac/appcast-x86_64.xml`
+- Sparkle index appcast: `https://vikiea.github.io/age_mac/appcast.xml`
 
 ## Commercial Readiness
 

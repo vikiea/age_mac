@@ -15,7 +15,8 @@ The app processes selected files, local settings, operation history, and age key
 Age Mac uses Sparkle for update checks. Sparkle fetches public update metadata from:
 
 ```text
-https://vikiea.github.io/age_mac/appcast.xml
+https://vikiea.github.io/age_mac/appcast-arm64.xml
+https://vikiea.github.io/age_mac/appcast-x86_64.xml
 ```
 
 Ordinary web request metadata may be visible to GitHub Pages and network infrastructure, but Age Mac does not add your files, keys, passphrases, or operation history to update requests.

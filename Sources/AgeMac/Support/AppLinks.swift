@@ -12,4 +12,6 @@ enum AppLinks {
     static let license = URL(string: "https://github.com/vikiea/age_mac/blob/main/LICENSE")!
     static let releases = URL(string: "https://github.com/vikiea/age_mac/releases")!
     static let appcast = URL(string: "https://vikiea.github.io/age_mac/appcast.xml")!
+    static let arm64Appcast = URL(string: "https://vikiea.github.io/age_mac/appcast-arm64.xml")!
+    static let x86_64Appcast = URL(string: "https://vikiea.github.io/age_mac/appcast-x86_64.xml")!
 }
