@@ -110,10 +110,10 @@ The app reads update metadata from:
 https://vikiea.github.io/age_mac/appcast.xml
 ```
 
-The release archive URL prefix is:
+Release archives are uploaded as GitHub Release assets. The appcast points to:
 
 ```text
-https://vikiea.github.io/age_mac/releases/
+https://github.com/vikiea/age_mac/releases/download/v<version>/AgeMac-<version>.zip
 ```
 
 ## GitHub Pages

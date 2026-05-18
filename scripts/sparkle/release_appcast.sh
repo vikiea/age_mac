@@ -11,7 +11,6 @@ APP_NAME="AgeMac"
 APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
 RELEASE_DIR="$ROOT_DIR/docs/releases"
 APPCAST_PATH="$ROOT_DIR/docs/appcast.xml"
-DOWNLOAD_PREFIX="https://vikiea.github.io/age_mac/releases/"
 PROJECT_LINK="https://vikiea.github.io/age_mac/"
 
 find_generate_appcast() {
@@ -36,6 +35,7 @@ fi
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_BUNDLE/Contents/Info.plist")"
 ARCHIVE="$RELEASE_DIR/$APP_NAME-$VERSION.zip"
+DOWNLOAD_PREFIX="https://github.com/vikiea/age_mac/releases/download/v$VERSION/"
 
 mkdir -p "$RELEASE_DIR"
 rm -f "$ARCHIVE"
@@ -46,5 +46,21 @@ rm -f "$ARCHIVE"
   --link "$PROJECT_LINK" \
   -o "$APPCAST_PATH" \
   "$RELEASE_DIR"
+
+if ! grep -q 'Copyright (c) 2026 vikiea' "$APPCAST_PATH"; then
+  tmp_appcast="$(mktemp)"
+  awk 'NR == 1 {
+         print
+         print "<!--"
+         print "Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>"
+         print "This code is released under the MIT License."
+         print "See LICENSE for details."
+         print "-->"
+         next
+       } { print }' "$APPCAST_PATH" > "$tmp_appcast"
+  mv "$tmp_appcast" "$APPCAST_PATH"
+fi
+
+tail -c 1 "$APPCAST_PATH" | grep -q '^$' || printf '\n' >> "$APPCAST_PATH"
 
 printf 'Updated %s with %s\n' "$APPCAST_PATH" "$ARCHIVE"

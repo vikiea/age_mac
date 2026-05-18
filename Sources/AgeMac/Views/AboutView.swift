@@ -15,46 +15,44 @@ struct AboutView: View {
         ZStack {
             DetailBackground(theme: store.settings.theme)
 
-            VStack(alignment: .leading, spacing: 18) {
-                header
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
 
-                GlassCard {
-                    Label("作者", systemImage: "person.crop.circle")
-                        .font(.headline)
-                    Text("vikiea <vikiea@users.noreply.github.com>")
-                        .textSelection(.enabled)
-                }
-
-                GlassCard {
-                    Label("项目", systemImage: "curlybraces")
-                        .font(.headline)
-                    LinkRow(title: "GitHub", subtitle: "github.com/vikiea/age_mac", systemImage: "chevron.left.forwardslash.chevron.right", url: AppLinks.repository)
-                    LinkRow(title: "隐私协议", subtitle: "本地优先的数据处理说明", systemImage: "hand.raised", url: AppLinks.privacy)
-                    LinkRow(title: "开源协议", subtitle: "MIT License", systemImage: "doc.text", url: AppLinks.license)
-                    LinkRow(title: "版本发布", subtitle: "GitHub Releases", systemImage: "shippingbox", url: AppLinks.releases)
-                }
-
-                GlassCard {
-                    HStack {
-                        Label("开源组件", systemImage: "square.stack.3d.up")
+                    GlassCard {
+                        Label("项目", systemImage: "curlybraces")
                             .font(.headline)
-                        Spacer()
-                        Button {
-                            updateService.checkForUpdates()
-                        } label: {
-                            Label("检测更新", systemImage: "arrow.triangle.2.circlepath")
-                        }
+                        LinkRow(title: "GitHub", subtitle: "github.com/vikiea/age_mac", systemImage: "chevron.left.forwardslash.chevron.right", url: AppLinks.repository)
+                        LinkRow(title: "隐私协议", subtitle: "本地优先的数据处理说明", systemImage: "hand.raised", url: AppLinks.privacy)
+                        LinkRow(title: "开源协议", subtitle: "MIT License", systemImage: "doc.text", url: AppLinks.license)
+                        LinkRow(title: "版本发布", subtitle: "GitHub Releases", systemImage: "shippingbox", url: AppLinks.releases)
                     }
 
-                    ComponentRow(name: "Sparkle", purpose: "macOS 在线更新", license: "MIT")
-                    ComponentRow(name: "filippo.io/age", purpose: "age 加密格式与 X25519 支持", license: "BSD-style")
-                    ComponentRow(name: "SwiftUI / AppKit", purpose: "macOS 原生界面", license: "Apple SDK")
-                    ComponentRow(name: "Go", purpose: "流式加解密引擎", license: "BSD-style")
+                    GlassCard {
+                        HStack {
+                            Label("开源组件", systemImage: "square.stack.3d.up")
+                                .font(.headline)
+                            Spacer()
+                            Button {
+                                updateService.checkForUpdates()
+                            } label: {
+                                Label("检测更新", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                        }
+
+                        ComponentRow(name: "Sparkle", purpose: "macOS 在线更新", license: "MIT")
+                        ComponentRow(name: "filippo.io/age", purpose: "age 加密格式与 X25519 支持", license: "BSD-style")
+                        ComponentRow(name: "SwiftUI / AppKit", purpose: "macOS 原生界面", license: "Apple SDK")
+                        ComponentRow(name: "Go", purpose: "流式加解密引擎", license: "BSD-style")
+                    }
                 }
+                .padding(.top, 54)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
             }
-            .padding(24)
+            .scrollClipDisabled()
         }
-        .frame(width: 560, height: 620)
+        .frame(width: 580, height: 620)
     }
 
     private var header: some View {

@@ -104,6 +104,7 @@ enum AppTheme: String, Codable, CaseIterable, Identifiable {
     case rose
     case amber
     case graphite
+    case gaussian
 
     var id: String { rawValue }
 
@@ -115,6 +116,7 @@ enum AppTheme: String, Codable, CaseIterable, Identifiable {
         case .rose: "玫红"
         case .amber: "琥珀"
         case .graphite: "石墨"
+        case .gaussian: "高斯透明"
         }
     }
 }

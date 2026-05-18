@@ -4,6 +4,7 @@
  * See LICENSE for details.
  */
 
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -90,15 +91,32 @@ struct DetailBackground: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [
-                stableWindowBackground,
-                theme.accentColor.opacity(themeOpacity),
-                theme.secondaryColor.opacity(themeOpacity)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            stableWindowBackground
+            if theme == .gaussian {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.24),
+                        theme.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.11),
+                        theme.secondaryColor.opacity(colorScheme == .dark ? 0.12 : 0.09)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        theme.accentColor.opacity(themeOpacity),
+                        theme.secondaryColor.opacity(themeOpacity)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
         .ignoresSafeArea()
     }
 
@@ -117,24 +135,119 @@ struct DetailBackground: View {
 }
 
 struct SidebarView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var store: AppStore
     @Binding var selection: AppSection?
 
     var body: some View {
         List(AppSection.allCases, selection: $selection) { section in
-            HStack(spacing: 10) {
-                Image(systemName: section.systemImage)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(section.title)
-                    Text(section.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            ZStack {
+                if selection == section {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(selectionBackground)
                 }
+
+                HStack(spacing: 10) {
+                    Image(systemName: section.systemImage)
+                        .foregroundStyle(iconColor(for: section))
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(section.title)
+                            .foregroundStyle(titleColor(for: section))
+                            .fontWeight(selection == section ? .semibold : .regular)
+                        Text(section.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(subtitleColor(for: section))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .accessibilityAddTraits(selection == section ? .isSelected : [])
             .tag(section)
         }
         .listStyle(.sidebar)
+        .background(SidebarSelectionHighlightDisabler())
+    }
+
+    private func iconColor(for section: AppSection) -> Color {
+        selection == section ? selectedForeground : store.settings.theme.accentColor.opacity(0.72)
+    }
+
+    private func titleColor(for section: AppSection) -> Color {
+        selection == section ? selectedForeground : .primary
+    }
+
+    private func subtitleColor(for section: AppSection) -> Color {
+        selection == section ? selectedForeground.opacity(0.82) : .secondary
+    }
+
+    private var selectionBackground: some ShapeStyle {
+        LinearGradient(
+            colors: [
+                store.settings.theme.accentColor.opacity(selectionOpacity),
+                store.settings.theme.secondaryColor.opacity(selectionOpacity * 0.86)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var selectedForeground: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+
+    private var selectionOpacity: Double {
+        colorScheme == .dark ? 0.38 : 0.24
+    }
+}
+
+private struct SidebarSelectionHighlightDisabler: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            view.disableEnclosingTableSelectionHighlight()
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            nsView.disableEnclosingTableSelectionHighlight()
+        }
+    }
+}
+
+private extension NSView {
+    func disableEnclosingTableSelectionHighlight() {
+        var candidate: NSView? = self
+        while let view = candidate {
+            if let tableView = view as? NSTableView {
+                tableView.selectionHighlightStyle = .none
+                return
+            }
+            if let tableView = view.firstDescendant(of: NSTableView.self) {
+                tableView.selectionHighlightStyle = .none
+                return
+            }
+            candidate = view.superview
+        }
+    }
+
+    func firstDescendant<T: NSView>(of type: T.Type) -> T? {
+        for subview in subviews {
+            if let match = subview as? T {
+                return match
+            }
+            if let match = subview.firstDescendant(of: type) {
+                return match
+            }
+        }
+        return nil
     }
 }

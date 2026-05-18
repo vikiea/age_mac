@@ -304,6 +304,7 @@ extension AppTheme {
         case .rose: .pink
         case .amber: .orange
         case .graphite: .gray
+        case .gaussian: Color(red: 0.26, green: 0.72, blue: 0.92)
         }
     }
 
@@ -315,6 +316,7 @@ extension AppTheme {
         case .rose: .orange
         case .amber: .blue
         case .graphite: .teal
+        case .gaussian: Color(red: 0.82, green: 0.56, blue: 0.94)
         }
     }
 
