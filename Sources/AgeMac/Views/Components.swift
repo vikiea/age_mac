@@ -15,18 +15,42 @@ struct GlassCard<Content: View>: View {
 }
 
 struct GlassSurface: ViewModifier {
+    @Environment(\.controlActiveState) private var controlActiveState
+
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
             content
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(inactiveFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(inactiveStroke, lineWidth: 1)
+                }
         } else {
             content
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(inactiveFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(.white.opacity(0.16), lineWidth: 1)
+                        .stroke(activeStroke, lineWidth: 1)
                 }
         }
+    }
+
+    private var isInactive: Bool {
+        controlActiveState == .inactive
+    }
+
+    private var inactiveFill: Color {
+        isInactive ? Color.primary.opacity(0.035) : .clear
+    }
+
+    private var activeStroke: Color {
+        isInactive ? Color.primary.opacity(0.12) : Color.white.opacity(0.16)
+    }
+
+    private var inactiveStroke: Color {
+        isInactive ? Color.primary.opacity(0.1) : .clear
     }
 }
 
@@ -189,6 +213,7 @@ struct PrimaryActionCell: View {
     var disabled: Bool
     var action: () -> Void
     @EnvironmentObject private var store: AppStore
+    @Environment(\.controlActiveState) private var controlActiveState
 
     var body: some View {
         Button(action: action) {
@@ -233,7 +258,7 @@ struct PrimaryActionCell: View {
 
     private var backgroundFill: some ShapeStyle {
         if disabled {
-            AnyShapeStyle(.regularMaterial)
+            AnyShapeStyle(disabledBackground)
         } else {
             AnyShapeStyle(LinearGradient(
                 colors: [store.settings.theme.accentColor, store.settings.theme.secondaryColor],
@@ -241,6 +266,10 @@ struct PrimaryActionCell: View {
                 endPoint: .bottomTrailing
             ))
         }
+    }
+
+    private var disabledBackground: Color {
+        controlActiveState == .inactive ? Color.primary.opacity(0.035) : Color.secondary.opacity(0.04)
     }
 
     private var foregroundStyle: Color {
@@ -252,7 +281,11 @@ struct PrimaryActionCell: View {
     }
 
     private var borderColor: Color {
-        disabled ? Color.secondary.opacity(0.22) : Color.white.opacity(0.22)
+        if disabled {
+            controlActiveState == .inactive ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.22)
+        } else {
+            Color.white.opacity(0.22)
+        }
     }
 }
 
