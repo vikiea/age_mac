@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var store: AppStore
-    @State private var searchText = ""
 
     var body: some View {
         NavigationSplitView {
@@ -10,27 +9,24 @@ struct ContentView: View {
         } detail: {
             ZStack {
                 DetailBackground(theme: store.settings.theme)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        switch store.selectedSection ?? .encrypt {
-                        case .encrypt:
-                            EncryptView()
-                        case .decrypt:
-                            DecryptView()
-                        case .keys:
-                            KeysView()
-                        case .history:
-                            HistoryView()
-                        case .settings:
-                            SettingsView()
-                        }
+                DetailScrollContainer {
+                    switch store.selectedSection ?? .encrypt {
+                    case .encrypt:
+                        EncryptView()
+                    case .decrypt:
+                        DecryptView()
+                    case .keys:
+                        KeysView()
+                    case .history:
+                        HistoryView()
+                    case .settings:
+                        SettingsView()
                     }
-                    .padding(24)
-                    .frame(maxWidth: 980, alignment: .leading)
                 }
+                .navigationTitle("Age Mac")
             }
         }
-        .searchable(text: $searchText, placement: .toolbar, prompt: "搜索历史和密钥")
+        .navigationSplitViewStyle(.balanced)
         .alert("Age Mac", isPresented: Binding(
             get: { store.alertMessage != nil },
             set: { if !$0 { store.alertMessage = nil } }
@@ -39,6 +35,38 @@ struct ContentView: View {
         } message: {
             Text(store.alertMessage ?? "")
         }
+    }
+}
+
+private struct DetailScrollContainer<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let edgePadding = edgePadding(for: width)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    content
+                }
+                .padding(.top, edgePadding.top)
+                .padding(.horizontal, edgePadding.horizontal)
+                .padding(.bottom, edgePadding.bottom)
+                .frame(width: width, alignment: .topLeading)
+                .frame(minHeight: height, alignment: .topLeading)
+                .geometryGroup()
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    private func edgePadding(for width: CGFloat) -> (horizontal: CGFloat, top: CGFloat, bottom: CGFloat) {
+        let horizontal = min(max(width * 0.024, 20), 36)
+        let top = min(max(width * 0.018, 22), 30)
+        let bottom = min(max(width * 0.028, 30), 44)
+        return (horizontal, top, bottom)
     }
 }
 
@@ -102,6 +130,5 @@ struct SidebarView: View {
             .tag(section)
         }
         .listStyle(.sidebar)
-        .navigationTitle("Age Mac")
     }
 }

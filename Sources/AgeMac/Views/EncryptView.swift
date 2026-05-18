@@ -11,42 +11,27 @@ struct EncryptView: View {
         }
 
         GlassCard {
-            HStack {
-                Picker("模式", selection: $store.encryptMode) {
-                    ForEach(EncryptionMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 220)
+            HStack(spacing: 12) {
+                modePicker
 
                 Toggle("压缩", isOn: $store.settings.compressEnabled)
                     .onChange(of: store.settings.compressEnabled) { _, _ in store.saveSettings() }
+                    .fixedSize()
 
                 Text(store.encryptMode.detail)
                     .foregroundStyle(.secondary)
-
-                Spacer()
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if store.encryptMode == .batchPack {
-                HStack {
-                    TextField("输出文件名", text: $store.archiveBaseName)
-                        .textFieldStyle(.roundedBorder)
-                    Text(store.settings.compressEnabled ? ".tar.gz.age" : ".tar.age")
-                        .foregroundStyle(.secondary)
-                }
+                archiveNameRow
             }
         }
 
         GlassCard {
-            Picker("加密方式", selection: $store.encryptAuthMode) {
-                ForEach(AuthMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 220)
+            authModePicker
 
             if store.encryptAuthMode == .passphrase {
                 SecureField("密码", text: $store.encryptPassphrase)
@@ -96,5 +81,36 @@ struct EncryptView: View {
             }
             .keyboardShortcut(.return, modifiers: [.command])
         }
+    }
+
+    private var modePicker: some View {
+        Picker("模式", selection: $store.encryptMode) {
+            ForEach(EncryptionMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(minWidth: 200, idealWidth: 220, maxWidth: 280)
+    }
+
+    private var archiveNameRow: some View {
+        HStack(spacing: 10) {
+            TextField("输出文件名", text: $store.archiveBaseName)
+                .textFieldStyle(.roundedBorder)
+                .frame(minWidth: 120)
+            Text(store.settings.compressEnabled ? ".tar.gz.age" : ".tar.age")
+                .foregroundStyle(.secondary)
+                .fixedSize()
+        }
+    }
+
+    private var authModePicker: some View {
+        Picker("加密方式", selection: $store.encryptAuthMode) {
+            ForEach(AuthMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(minWidth: 200, idealWidth: 220, maxWidth: 280)
     }
 }

@@ -11,13 +11,7 @@ struct DecryptView: View {
         }
 
         GlassCard {
-            Picker("解密方式", selection: $store.decryptAuthMode) {
-                ForEach(AuthMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 220)
+            authModePicker
 
             if store.decryptAuthMode == .passphrase {
                 SecureField("密码", text: $store.decryptPassphrase)
@@ -67,5 +61,15 @@ struct DecryptView: View {
             }
             .keyboardShortcut(.return, modifiers: [.command])
         }
+    }
+
+    private var authModePicker: some View {
+        Picker("解密方式", selection: $store.decryptAuthMode) {
+            ForEach(AuthMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(minWidth: 200, idealWidth: 220, maxWidth: 280)
     }
 }
