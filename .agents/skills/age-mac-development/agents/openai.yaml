@@ -1,3 +1,7 @@
+# Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>
+# This code is released under the MIT License.
+# See LICENSE for details.
+
 name: age-mac-development
 display_name: Age Mac Development
 short_description: Build and extend the standalone Age Mac SwiftUI app and Go age engine.

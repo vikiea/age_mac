@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>
+ * This code is released under the MIT License.
+ * See LICENSE for details.
+ */
+
 import AppKit
 import SwiftUI
 
@@ -20,17 +26,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct AgeMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = AppStore()
+    @StateObject private var updateService = UpdateService()
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup("Age Mac") {
             ContentView()
                 .environmentObject(store)
+                .environmentObject(updateService)
                 .frame(minWidth: 1060, minHeight: 720)
                 .tint(store.settings.theme.accentColor)
                 .background(FocusClearingOverlay())
         }
         .defaultSize(width: 1180, height: 760)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("关于 Age Mac") {
+                    openWindow(id: "about")
+                }
+            }
+
             CommandGroup(after: .newItem) {
                 Button("添加加密文件") {
                     store.selectedSection = .encrypt
@@ -59,6 +74,12 @@ struct AgeMacApp: App {
 
                 Divider()
 
+                Button("检测更新") {
+                    updateService.checkForUpdates()
+                }
+
+                Divider()
+
                 Button("取消当前任务") {
                     store.cancelCurrentTask()
                 }
@@ -72,5 +93,12 @@ struct AgeMacApp: App {
                 .padding()
                 .frame(width: 620)
         }
+
+        Window("关于 Age Mac", id: "about") {
+            AboutView()
+                .environmentObject(store)
+                .environmentObject(updateService)
+        }
+        .windowResizability(.contentSize)
     }
 }

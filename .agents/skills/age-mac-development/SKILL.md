@@ -3,6 +3,12 @@ name: age-mac-development
 description: Develop, build, run, debug, or extend the Age Mac standalone macOS app. Use when working in /Users/qinfuling/www/github/person/age_mac, changing SwiftUI UI, the Go age engine, long-running task execution, key/history/settings persistence, Liquid Glass styling, or project verification.
 ---
 
+<!--
+Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>
+This code is released under the MIT License.
+See LICENSE for details.
+-->
+
 # Age Mac Development
 
 ## Scope

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>
+// This code is released under the MIT License.
+// See LICENSE for details.
+
 module age_mac_engine
 
 go 1.26

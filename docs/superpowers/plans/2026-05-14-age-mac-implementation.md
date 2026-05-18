@@ -1,3 +1,9 @@
+<!--
+Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>
+This code is released under the MIT License.
+See LICENSE for details.
+-->
+
 # Age Mac Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
