@@ -207,7 +207,7 @@ struct AppSettings: Codable, Hashable {
         return AppSettings(
             outputDirectory: home.appendingPathComponent("Documents/Age Mac Output").path,
             duplicateStrategy: .rename,
-            compressEnabled: true,
+            compressEnabled: false,
             concurrency: 4,
             theme: .teal,
             gaussianTransparencyEnabled: false,

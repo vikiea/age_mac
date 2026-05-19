@@ -176,17 +176,20 @@ struct TaskStatusCard: View {
                 }
 
                 if !task.outputs.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(task.outputs.prefix(4), id: \.self) { output in
-                            Button {
-                                store.reveal(path: output)
-                            } label: {
-                                Label(AppFormatters.shortPath(output), systemImage: "arrow.up.right.square")
-                                    .lineLimit(1)
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 6) {
+                            ForEach(task.outputs, id: \.self) { output in
+                                Button {
+                                    store.reveal(path: output)
+                                } label: {
+                                    Label(AppFormatters.shortPath(output), systemImage: "arrow.up.right.square")
+                                        .lineLimit(1)
+                                }
+                                .buttonStyle(.link)
                             }
-                            .buttonStyle(.link)
                         }
                     }
+                    .frame(maxHeight: 140)
                 }
 
                 if task.status == .running {

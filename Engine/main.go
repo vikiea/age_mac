@@ -8,6 +8,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
@@ -17,11 +18,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 
 	"filippo.io/age"
 	"filippo.io/age/armor"
 )
+
+const maxConcurrency = 12
+
+var emitMu sync.Mutex
+var outputPathMu sync.Mutex
 
 type fileSpec struct {
 	Path string `json:"path"`
@@ -71,6 +79,8 @@ func fail(err error) {
 
 func emit(e event) {
 	data, _ := json.Marshal(e)
+	emitMu.Lock()
+	defer emitMu.Unlock()
 	fmt.Println(string(data))
 }
 
@@ -93,14 +103,16 @@ func encryptBatch(args []string) error {
 	fs := flag.NewFlagSet("encrypt-batch", flag.ContinueOnError)
 	filesJSON := fs.String("files-json", "", "path to file list json")
 	outputDir := fs.String("output-dir", "", "base output directory")
-	outputName := fs.String("output-name", "archive.tar.gz.age", "output file name")
-	compress := fs.Bool("compress", true, "write tar.gz before encryption")
+	outputName := fs.String("output-name", "archive.tar.age", "output file name")
+	compress := fs.Bool("compress", false, "write tar.gz before encryption")
 	auth := fs.String("auth", "passphrase", "passphrase or publicKey")
 	secretFile := fs.String("secret-file", "", "file containing passphrase or public key")
 	duplicate := fs.String("duplicate", "rename", "rename or overwrite")
+	concurrency := fs.Int("concurrency", 1, "maximum concurrent file operations")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	_ = clampConcurrency(*concurrency)
 
 	files, err := loadFiles(*filesJSON)
 	if err != nil {
@@ -127,23 +139,8 @@ func encryptBatch(args []string) error {
 		return err
 	}
 
-	tempDir, err := os.MkdirTemp("", "age-mac-batch-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tempDir)
-
-	archivePath := filepath.Join(tempDir, "payload.tar")
-	if *compress {
-		archivePath += ".gz"
-	}
-
 	emit(event{Event: "progress", Phase: "Packing", Processed: 0, Total: len(files), Progress: 0.05})
-	if err := writeArchive(files, archivePath, *compress, 0.05, 0.45); err != nil {
-		return err
-	}
-	emit(event{Event: "progress", Phase: "Encrypting", Processed: len(files), Total: len(files), Progress: 0.55})
-	if err := encryptFile(archivePath, outPath, recipient); err != nil {
+	if err := encryptArchiveToFile(files, outPath, recipient, *compress, 0.05, 0.95); err != nil {
 		return err
 	}
 	emit(event{Event: "file", Output: outPath})
@@ -155,10 +152,11 @@ func encryptSeparate(args []string) error {
 	fs := flag.NewFlagSet("encrypt-separate", flag.ContinueOnError)
 	filesJSON := fs.String("files-json", "", "path to file list json")
 	outputDir := fs.String("output-dir", "", "base output directory")
-	compress := fs.Bool("compress", true, "write tar.gz before encryption")
+	compress := fs.Bool("compress", false, "write tar.gz before encryption")
 	auth := fs.String("auth", "passphrase", "passphrase or publicKey")
 	secretFile := fs.String("secret-file", "", "file containing passphrase or public key")
 	duplicate := fs.String("duplicate", "rename", "rename or overwrite")
+	concurrency := fs.Int("concurrency", 1, "maximum concurrent file operations")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -183,29 +181,7 @@ func encryptSeparate(args []string) error {
 		return err
 	}
 
-	tempDir, err := os.MkdirTemp("", "age-mac-separate-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tempDir)
-
-	outputs := make([]string, 0, len(files))
-	success := 0
-	failures := 0
-	failureMessages := []string{}
-	for index, file := range files {
-		phase := fmt.Sprintf("Encrypting %s", file.Name)
-		emit(event{Event: "progress", Phase: phase, Processed: index, Total: len(files), Success: success, Fail: failures, Progress: float64(index) / float64(len(files))})
-
-		archivePath := filepath.Join(tempDir, fmt.Sprintf("payload-%d.tar", index))
-		if *compress {
-			archivePath += ".gz"
-		}
-		if err := writeArchive([]fileSpec{file}, archivePath, *compress, 0, 0); err != nil {
-			failures++
-			failureMessages = append(failureMessages, fmt.Sprintf("%s: %v", file.Name, err))
-			continue
-		}
+	results := runFileWorkers(files, clampConcurrency(*concurrency), func(index int, file fileSpec) operationResult {
 		base := strings.TrimSuffix(file.Name, filepath.Ext(file.Name))
 		if base == "" {
 			base = file.Name
@@ -216,19 +192,14 @@ func encryptSeparate(args []string) error {
 		}
 		outPath, err := outputPath(root, base+extension, *duplicate)
 		if err != nil {
-			failures++
-			failureMessages = append(failureMessages, fmt.Sprintf("%s: %v", file.Name, err))
-			continue
+			return operationResult{index: index, name: file.Name, err: err}
 		}
-		if err := encryptFile(archivePath, outPath, recipient); err != nil {
-			failures++
-			failureMessages = append(failureMessages, fmt.Sprintf("%s: %v", file.Name, err))
-			continue
+		if err := encryptArchiveToFile([]fileSpec{file}, outPath, recipient, *compress, 0, 0); err != nil {
+			return operationResult{index: index, name: file.Name, err: err}
 		}
-		success++
-		outputs = append(outputs, outPath)
-		emit(event{Event: "file", Output: outPath})
-	}
+		return operationResult{index: index, name: file.Name, outputs: []string{outPath}}
+	})
+	outputs, success, failures, failureMessages := summarizeResults(results)
 
 	emit(event{Event: "done", Phase: "Complete", Progress: 1, Processed: len(files), Total: len(files), Success: success, Fail: failures, Outputs: outputs})
 	if success == 0 && failures > 0 {
@@ -247,6 +218,7 @@ func decryptFiles(args []string) error {
 	auth := fs.String("auth", "passphrase", "passphrase or privateKey")
 	secretFile := fs.String("secret-file", "", "file containing passphrase or private key")
 	duplicate := fs.String("duplicate", "rename", "rename or overwrite")
+	concurrency := fs.Int("concurrency", 1, "maximum concurrent file operations")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -271,36 +243,16 @@ func decryptFiles(args []string) error {
 		return err
 	}
 
-	tempDir, err := os.MkdirTemp("", "age-mac-decrypt-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tempDir)
-
-	outputs := []string{}
-	success := 0
-	failures := 0
-	failureMessages := []string{}
-	for index, file := range files {
-		emit(event{Event: "progress", Phase: "Decrypting " + file.Name, Processed: index, Total: len(files), Success: success, Fail: failures, Progress: float64(index) / float64(len(files))})
-		decryptedPath := filepath.Join(tempDir, fmt.Sprintf("decrypted-%d.bin", index))
-		if err := decryptFile(file.Path, decryptedPath, identity); err != nil {
-			failures++
-			failureMessages = append(failureMessages, fmt.Sprintf("%s: %v", file.Name, err))
-			continue
-		}
-		written, err := unpackOrWrite(decryptedPath, root, file.Name, *duplicate)
+	progress := newDecryptProgressTracker(files)
+	progress.start()
+	results := runFileWorkers(files, clampConcurrency(*concurrency), func(index int, file fileSpec) operationResult {
+		written, err := decryptFileToOutputs(file.Path, root, file.Name, identity, *duplicate, progress)
 		if err != nil {
-			failures++
-			failureMessages = append(failureMessages, fmt.Sprintf("%s: %v", file.Name, err))
-			continue
+			return operationResult{index: index, name: file.Name, err: err}
 		}
-		success++
-		outputs = append(outputs, written...)
-		for _, out := range written {
-			emit(event{Event: "file", Output: out})
-		}
-	}
+		return operationResult{index: index, name: file.Name, outputs: written, outputsEmitted: true}
+	})
+	outputs, success, failures, failureMessages := summarizeResults(results)
 
 	emit(event{Event: "done", Phase: "Complete", Progress: 1, Processed: len(files), Total: len(files), Success: success, Fail: failures, Outputs: outputs})
 	if success == 0 && failures > 0 {
@@ -385,43 +337,123 @@ func ensureSubdir(root string, name string) (string, error) {
 	return dir, nil
 }
 
+func clampConcurrency(value int) int {
+	if value < 1 {
+		return 1
+	}
+	if value > maxConcurrency {
+		return maxConcurrency
+	}
+	return value
+}
+
 func outputPath(dir string, name string, duplicate string) (string, error) {
+	outputPathMu.Lock()
+	defer outputPathMu.Unlock()
+	return outputPathLocked(dir, name, duplicate)
+}
+
+func outputPathLocked(dir string, name string, duplicate string) (string, error) {
 	if name == "" {
 		return "", errors.New("empty output name")
 	}
 	cleanName := filepath.Base(name)
 	path := filepath.Join(dir, cleanName)
 	if duplicate == "overwrite" {
+		if err := reserveOutputPath(path); err != nil {
+			return "", err
+		}
 		return path, nil
 	}
 	ext := filepath.Ext(cleanName)
 	base := strings.TrimSuffix(cleanName, ext)
 	for i := 2; ; i++ {
-		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		if outputCandidateAvailable(path) {
+			if err := reserveOutputPath(path); err != nil {
+				if errors.Is(err, os.ErrExist) {
+					path = filepath.Join(dir, fmt.Sprintf("%s %d%s", base, i, ext))
+					continue
+				}
+				return "", err
+			}
 			return path, nil
 		}
 		path = filepath.Join(dir, fmt.Sprintf("%s %d%s", base, i, ext))
 	}
 }
 
-func writeArchive(files []fileSpec, outputPath string, compress bool, start float64, end float64) error {
-	out, err := os.Create(outputPath)
+func outputCandidateAvailable(path string) bool {
+	if _, err := os.Stat(path); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	if _, err := os.Stat(partialPath(path)); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
+func reserveOutputPath(path string) error {
+	partial := partialPath(path)
+	file, err := os.OpenFile(partial, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	return file.Close()
+}
 
-	var tarTarget io.Writer = out
+func partialPath(path string) string {
+	return path + ".partial"
+}
+
+func createPartial(path string) (*os.File, string, error) {
+	partial := partialPath(path)
+	out, err := os.OpenFile(partial, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return nil, "", err
+	}
+	return out, partial, nil
+}
+
+func finishPartial(file *os.File, partial string, final string, errp *error) {
+	if closeErr := file.Close(); *errp == nil && closeErr != nil {
+		*errp = closeErr
+	}
+	if *errp != nil {
+		_ = os.Remove(partial)
+		return
+	}
+	if renameErr := os.Rename(partial, final); renameErr != nil {
+		*errp = renameErr
+		_ = os.Remove(partial)
+	}
+}
+
+func encryptArchiveToFile(files []fileSpec, outputPath string, recipient age.Recipient, compress bool, start float64, end float64) (err error) {
+	out, partial, err := createPartial(outputPath)
+	if err != nil {
+		return err
+	}
+	defer finishPartial(out, partial, outputPath, &err)
+
+	ageWriter, err := age.Encrypt(out, recipient)
+	if err != nil {
+		return err
+	}
+	var ageClosed bool
+	defer func() {
+		if !ageClosed {
+			_ = ageWriter.Close()
+		}
+	}()
+
+	var tarTarget io.Writer = ageWriter
 	var gz *gzip.Writer
 	if compress {
-		gz = gzip.NewWriter(out)
-		defer gz.Close()
+		gz = gzip.NewWriter(ageWriter)
 		tarTarget = gz
 	}
 
 	tw := tar.NewWriter(tarTarget)
-	defer tw.Close()
-
 	for index, file := range files {
 		if err := addFileToTar(tw, file); err != nil {
 			return err
@@ -431,6 +463,18 @@ func writeArchive(files []fileSpec, outputPath string, compress bool, start floa
 			emit(event{Event: "progress", Phase: "Packing", Processed: index + 1, Total: len(files), Progress: progress})
 		}
 	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	if gz != nil {
+		if err := gz.Close(); err != nil {
+			return err
+		}
+	}
+	if err := ageWriter.Close(); err != nil {
+		return err
+	}
+	ageClosed = true
 	return nil
 }
 
@@ -459,66 +503,166 @@ func addFileToTar(tw *tar.Writer, file fileSpec) error {
 	return err
 }
 
-func encryptFile(inputPath string, outputPath string, recipient age.Recipient) error {
+type operationResult struct {
+	index          int
+	name           string
+	outputs        []string
+	outputsEmitted bool
+	err            error
+}
+
+func runFileWorkers(files []fileSpec, concurrency int, work func(index int, file fileSpec) operationResult) []operationResult {
+	type job struct {
+		index int
+		file  fileSpec
+	}
+
+	jobs := make(chan job)
+	results := make(chan operationResult, len(files))
+	var wg sync.WaitGroup
+	workers := concurrency
+	if workers > len(files) {
+		workers = len(files)
+	}
+	if workers < 1 {
+		workers = 1
+	}
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				results <- work(job.index, job.file)
+			}
+		}()
+	}
+
+	go func() {
+		for index, file := range files {
+			jobs <- job{index: index, file: file}
+		}
+		close(jobs)
+		wg.Wait()
+		close(results)
+	}()
+
+	collected := make([]operationResult, 0, len(files))
+	success := 0
+	failures := 0
+	for result := range results {
+		collected = append(collected, result)
+		if result.err != nil {
+			failures++
+		} else {
+			success++
+			if !result.outputsEmitted {
+				for _, output := range result.outputs {
+					emit(event{Event: "file", Output: output})
+				}
+			}
+		}
+		processed := success + failures
+		emit(event{
+			Event:     "progress",
+			Phase:     fmt.Sprintf("Processed %s", result.name),
+			Processed: processed,
+			Total:     len(files),
+			Success:   success,
+			Fail:      failures,
+			Progress:  float64(processed) / float64(len(files)),
+		})
+	}
+	return collected
+}
+
+func summarizeResults(results []operationResult) ([]string, int, int, []string) {
+	outputs := []string{}
+	failureMessages := []string{}
+	success := 0
+	failures := 0
+	for _, result := range results {
+		if result.err != nil {
+			failures++
+			failureMessages = append(failureMessages, fmt.Sprintf("%s: %v", result.name, result.err))
+			continue
+		}
+		success++
+		outputs = append(outputs, result.outputs...)
+	}
+	return outputs, success, failures, failureMessages
+}
+
+type decryptProgressTracker struct {
+	mu           sync.Mutex
+	totalBytes   int64
+	written      int64
+	totalFiles   int
+	lastProgress float64
+}
+
+func newDecryptProgressTracker(files []fileSpec) *decryptProgressTracker {
+	var totalBytes int64
+	for _, file := range files {
+		if info, err := os.Stat(file.Path); err == nil && info.Size() > 0 {
+			totalBytes += info.Size()
+		}
+	}
+	return &decryptProgressTracker{totalBytes: totalBytes, totalFiles: len(files)}
+}
+
+func (t *decryptProgressTracker) start() {
+	emit(event{Event: "progress", Phase: "解密中", Processed: 0, Total: t.totalFiles, Progress: 0.01})
+}
+
+func (t *decryptProgressTracker) addWritten(n int64, label string) {
+	if t == nil || n <= 0 {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.written += n
+	if t.totalBytes <= 0 {
+		return
+	}
+	progress := float64(t.written) / float64(t.totalBytes)
+	if progress > 0.99 {
+		progress = 0.99
+	}
+	if progress < 0.01 {
+		progress = 0.01
+	}
+	if progress-t.lastProgress < 0.01 && progress < 0.99 {
+		return
+	}
+	t.lastProgress = progress
+	phase := "解密中"
+	if label != "" {
+		phase = "解密中 " + label
+	}
+	emit(event{Event: "progress", Phase: phase, Processed: 0, Total: t.totalFiles, Progress: progress})
+}
+
+func decryptFileToOutputs(inputPath string, outputDir string, originalName string, identity age.Identity, duplicate string, progress *decryptProgressTracker) ([]string, error) {
 	in, err := os.Open(inputPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer in.Close()
 
-	out, err := os.Create(outputPath)
+	source, err := ageSource(in)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer out.Close()
-
-	w, err := age.Encrypt(out, recipient)
+	decrypted, err := age.Decrypt(source, identity)
 	if err != nil {
-		return err
+		return nil, classifyDecryptError(err)
 	}
-	if _, err := io.Copy(w, in); err != nil {
-		_ = w.Close()
-		return err
-	}
-	return w.Close()
-}
-
-func decryptFile(inputPath string, outputPath string, identity age.Identity) error {
-	in, err := os.Open(inputPath)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	header := make([]byte, len("-----BEGIN AGE ENCRYPTED FILE-----"))
-	n, _ := io.ReadFull(in, header)
-	if _, err := in.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
-	var source io.Reader = in
-	if bytes.HasPrefix(header[:n], []byte("-----BEGIN AGE ENCRYPTED FILE-----")) {
-		source = armor.NewReader(in)
-	}
-
-	r, err := age.Decrypt(source, identity)
-	if err != nil {
-		return err
-	}
-
-	out, err := os.Create(outputPath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, r)
-	return err
-}
-
-func unpackOrWrite(inputPath string, outputDir string, originalName string, duplicate string) ([]string, error) {
-	if outputs, err := extractTarMaybeGzip(inputPath, outputDir, duplicate); err == nil && len(outputs) > 0 {
+	buffered := newReplayableReader(decrypted)
+	if outputs, err := extractTarMaybeGzipFromReader(buffered, outputDir, duplicate, progress); err == nil && len(outputs) > 0 {
 		return outputs, nil
+	} else if err != nil && !isNotArchiveError(err) {
+		return nil, classifyDecryptError(err)
 	}
 
 	name := strings.TrimSuffix(originalName, ".age")
@@ -529,45 +673,176 @@ func unpackOrWrite(inputPath string, outputDir string, originalName string, dupl
 	if err != nil {
 		return nil, err
 	}
-	in, err := os.Open(inputPath)
-	if err != nil {
-		return nil, err
+	if err := writeReaderToFile(buffered, outPath, func(n int64) {
+		progress.addWritten(n, name)
+	}); err != nil {
+		return nil, classifyDecryptError(err)
 	}
-	defer in.Close()
-	out, err := os.Create(outPath)
-	if err != nil {
-		return nil, err
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, in); err != nil {
-		return nil, err
-	}
+	emit(event{Event: "file", Output: outPath})
 	return []string{outPath}, nil
 }
 
-func extractTarMaybeGzip(inputPath string, outputDir string, duplicate string) ([]string, error) {
-	in, err := os.Open(inputPath)
-	if err != nil {
-		return nil, err
-	}
-	defer in.Close()
-
-	var source io.Reader = in
-	magic := make([]byte, 2)
-	n, _ := io.ReadFull(in, magic)
+func ageSource(in *os.File) (io.Reader, error) {
+	header := make([]byte, len("-----BEGIN AGE ENCRYPTED FILE-----"))
+	n, _ := io.ReadFull(in, header)
 	if _, err := in.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	if n == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
-		gz, err := gzip.NewReader(in)
+	var source io.Reader = in
+	if bytes.HasPrefix(header[:n], []byte("-----BEGIN AGE ENCRYPTED FILE-----")) {
+		source = armor.NewReader(in)
+	}
+	return source, nil
+}
+
+var errNotArchive = errors.New("not tar archive")
+
+type replayableReader struct {
+	source    *bufio.Reader
+	prefix    bytes.Buffer
+	recording bool
+	recorded  bytes.Buffer
+}
+
+func newReplayableReader(source io.Reader) *replayableReader {
+	return &replayableReader{source: bufio.NewReader(source)}
+}
+
+func (r *replayableReader) Read(p []byte) (int, error) {
+	if r.prefix.Len() > 0 {
+		return r.prefix.Read(p)
+	}
+	n, err := r.source.Read(p)
+	if r.recording && n > 0 {
+		_, _ = r.recorded.Write(p[:n])
+	}
+	return n, err
+}
+
+func (r *replayableReader) Peek(n int) ([]byte, error) {
+	if r.prefix.Len() > 0 {
+		buffered := append([]byte(nil), r.prefix.Bytes()...)
+		if len(buffered) >= n {
+			return buffered[:n], nil
+		}
+		peeked, err := r.source.Peek(n - len(buffered))
 		if err != nil {
 			return nil, err
 		}
+		buffered = append(buffered, peeked...)
+		return buffered, nil
+	}
+	return r.source.Peek(n)
+}
+
+func (r *replayableReader) startRecording() {
+	r.recorded.Reset()
+	r.recording = true
+}
+
+func (r *replayableReader) stopRecording() {
+	r.recording = false
+}
+
+func (r *replayableReader) rewindRecorded() {
+	r.recording = false
+	if r.recorded.Len() == 0 {
+		return
+	}
+	recorded := append([]byte(nil), r.recorded.Bytes()...)
+	if r.prefix.Len() > 0 {
+		recorded = append(recorded, r.prefix.Bytes()...)
+	}
+	r.prefix.Reset()
+	_, _ = r.prefix.Write(recorded)
+	r.recorded.Reset()
+}
+
+func extractTarMaybeGzipFromReader(source *replayableReader, outputDir string, duplicate string, progress *decryptProgressTracker) ([]string, error) {
+	magic, err := source.Peek(2)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, bufio.ErrBufferFull) {
+		return nil, err
+	}
+	var reader io.Reader = source
+	var gz *gzip.Reader
+	if len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
+		source.startRecording()
+		gz, err = gzip.NewReader(source)
+		if err != nil {
+			source.rewindRecorded()
+			return nil, err
+		}
+		gzBuffer := bufio.NewReader(gz)
+		header, err := gzBuffer.Peek(512)
+		if err != nil {
+			_ = gz.Close()
+			source.rewindRecorded()
+			if errors.Is(err, io.EOF) || errors.Is(err, bufio.ErrBufferFull) {
+				return nil, errNotArchive
+			}
+			return nil, err
+		}
+		if !looksLikeTarHeader(header) {
+			_ = gz.Close()
+			source.rewindRecorded()
+			return nil, errNotArchive
+		}
+		source.stopRecording()
 		defer gz.Close()
-		source = gz
+		reader = gzBuffer
+		return extractTarFromReader(reader, outputDir, duplicate, progress)
 	}
 
-	tr := tar.NewReader(source)
+	header, err := source.Peek(512)
+	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, bufio.ErrBufferFull) {
+			return nil, errNotArchive
+		}
+		return nil, err
+	}
+	if !looksLikeTarHeader(header) {
+		return nil, errNotArchive
+	}
+
+	return extractTarFromReader(reader, outputDir, duplicate, progress)
+}
+
+func looksLikeTarHeader(header []byte) bool {
+	if len(header) < 512 {
+		return false
+	}
+	hasData := false
+	for _, b := range header {
+		if b != 0 {
+			hasData = true
+			break
+		}
+	}
+	if !hasData {
+		return false
+	}
+
+	rawChecksum := strings.Trim(string(header[148:156]), " \x00")
+	if rawChecksum == "" {
+		return false
+	}
+	expected, err := strconv.ParseInt(rawChecksum, 8, 64)
+	if err != nil {
+		return false
+	}
+	var actual int64
+	for i, b := range header[:512] {
+		if i >= 148 && i < 156 {
+			actual += int64(' ')
+			continue
+		}
+		actual += int64(b)
+	}
+	return actual == expected
+}
+
+func extractTarFromReader(reader io.Reader, outputDir string, duplicate string, progress *decryptProgressTracker) ([]string, error) {
+	tr := tar.NewReader(reader)
 	outputs := []string{}
 	for {
 		header, err := tr.Next()
@@ -575,6 +850,9 @@ func extractTarMaybeGzip(inputPath string, outputDir string, duplicate string) (
 			break
 		}
 		if err != nil {
+			if len(outputs) == 0 {
+				return nil, errNotArchive
+			}
 			return nil, err
 		}
 		if header.FileInfo().IsDir() {
@@ -587,32 +865,87 @@ func extractTarMaybeGzip(inputPath string, outputDir string, duplicate string) (
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			return nil, err
 		}
-		out, err := os.Create(target)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := io.Copy(out, tr); err != nil {
-			_ = out.Close()
-			return nil, err
-		}
-		if err := out.Close(); err != nil {
+		label := filepath.Base(header.Name)
+		if err := writeReaderToFile(tr, target, func(n int64) {
+			progress.addWritten(n, label)
+		}); err != nil {
 			return nil, err
 		}
 		outputs = append(outputs, target)
+		emit(event{Event: "file", Output: target})
 	}
 	if len(outputs) == 0 {
-		return nil, errors.New("archive had no files")
+		return nil, errNotArchive
 	}
 	return outputs, nil
 }
 
+func isNotArchiveError(err error) bool {
+	return errors.Is(err, errNotArchive)
+}
+
+func writeReaderToFile(reader io.Reader, path string, onWrite func(int64)) (err error) {
+	out, partial, err := createPartial(path)
+	if err != nil {
+		return err
+	}
+	defer finishPartial(out, partial, path, &err)
+	target := io.Writer(out)
+	if onWrite != nil {
+		target = progressWriter{writer: out, onWrite: onWrite}
+	}
+	_, err = io.Copy(target, reader)
+	return err
+}
+
+type progressWriter struct {
+	writer  io.Writer
+	onWrite func(int64)
+}
+
+func (w progressWriter) Write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	if n > 0 {
+		w.onWrite(int64(n))
+	}
+	return n, err
+}
+
+func classifyDecryptError(err error) error {
+	if err == nil {
+		return nil
+	}
+	message := err.Error()
+	switch {
+	case errors.Is(err, io.ErrUnexpectedEOF),
+		strings.Contains(message, "failed to decrypt and authenticate payload chunk"),
+		strings.Contains(message, "trailing data after end of encrypted file"),
+		strings.Contains(message, "unexpected EOF"):
+		return fmt.Errorf("encrypted file is incomplete or corrupted: %w", err)
+	default:
+		return err
+	}
+}
+
 func safeOutputPath(root string, archiveName string, duplicate string) (string, error) {
+	outputPathMu.Lock()
+	defer outputPathMu.Unlock()
+	return safeOutputPathLocked(root, archiveName, duplicate)
+}
+
+func safeOutputPathLocked(root string, archiveName string, duplicate string) (string, error) {
 	clean := filepath.Clean(archiveName)
 	if filepath.IsAbs(clean) || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
 		return "", fmt.Errorf("unsafe archive path: %s", archiveName)
 	}
 	full := filepath.Join(root, clean)
+	if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
+		return "", err
+	}
 	if duplicate == "overwrite" {
+		if err := reserveOutputPath(full); err != nil {
+			return "", err
+		}
 		return full, nil
 	}
 	dir := filepath.Dir(full)
@@ -621,7 +954,14 @@ func safeOutputPath(root string, archiveName string, duplicate string) (string, 
 	stem := strings.TrimSuffix(base, ext)
 	candidate := full
 	for i := 2; ; i++ {
-		if _, err := os.Stat(candidate); errors.Is(err, os.ErrNotExist) {
+		if outputCandidateAvailable(candidate) {
+			if err := reserveOutputPath(candidate); err != nil {
+				if errors.Is(err, os.ErrExist) {
+					candidate = filepath.Join(dir, fmt.Sprintf("%s %d%s", stem, i, ext))
+					continue
+				}
+				return "", err
+			}
 			return candidate, nil
 		}
 		candidate = filepath.Join(dir, fmt.Sprintf("%s %d%s", stem, i, ext))

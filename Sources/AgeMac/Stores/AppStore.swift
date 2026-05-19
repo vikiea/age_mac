@@ -281,7 +281,8 @@ final class AppStore: ObservableObject {
                 outputDirectory: settings.outputDirectory,
                 authArgument: authArgument,
                 secret: secret,
-                duplicateStrategy: settings.duplicateStrategy
+                duplicateStrategy: settings.duplicateStrategy,
+                concurrency: settings.concurrency
             ),
             recipientInfo: String(recipientInfo)
         )
@@ -328,7 +329,8 @@ final class AppStore: ObservableObject {
                 outputDirectory: settings.outputDirectory,
                 authArgument: authArgument,
                 secret: secret,
-                duplicateStrategy: settings.duplicateStrategy
+                duplicateStrategy: settings.duplicateStrategy,
+                concurrency: settings.concurrency
             ),
             recipientInfo: recipientInfo
         )

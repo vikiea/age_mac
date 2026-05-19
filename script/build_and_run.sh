@@ -10,7 +10,7 @@ MODE="${1:-run}"
 APP_NAME="AgeMac"
 BUNDLE_ID="com.vikiea.age-mac"
 MIN_SYSTEM_VERSION="14.0"
-BUNDLE_VERSION="1.0.3"
+BUNDLE_VERSION="1.1.1"
 SPARKLE_FEED_URL="https://vikiea.github.io/age_mac/appcast.xml"
 SPARKLE_PUBLIC_ED_KEY="IGjw2mVnG2Q/TyUK14//dlR7yeJMYS2Fzx4mRa1ZBuA="
 

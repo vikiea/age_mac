@@ -62,7 +62,7 @@ struct HistoryView: View {
                                 Button {
                                     store.reveal(path: output)
                                 } label: {
-                                    Label("显示输出", systemImage: "arrow.up.right.square")
+                                    Label("显示 \(record.outputs.count) 个输出", systemImage: "arrow.up.right.square")
                                 }
                                 .buttonStyle(.link)
                             }

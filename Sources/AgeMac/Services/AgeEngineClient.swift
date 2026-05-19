@@ -27,6 +27,7 @@ struct EngineRequest {
     var authArgument: String
     var secret: String
     var duplicateStrategy: DuplicateStrategy
+    var concurrency: Int
 }
 
 enum EngineClientError: LocalizedError {
@@ -47,9 +48,16 @@ enum EngineErrorPresenter {
     static func userMessage(for rawMessage: String, command: EngineCommand) -> String {
         let lowercased = rawMessage.lowercased()
 
+        if lowercased.contains("encrypted file is incomplete or corrupted") ||
+            lowercased.contains("failed to decrypt and authenticate payload chunk") ||
+            lowercased.contains("unexpected eof") ||
+            lowercased.contains("trailing data after end of encrypted file") {
+            return "解密失败：文件不完整、已损坏，或加密输出未完整写入。请确认原始 .age 文件完整后重试。"
+        }
+
         if lowercased.contains("no identity matched any of the recipients") ||
             lowercased.contains("incorrect passphrase") ||
-            lowercased.contains("failed to decrypt") {
+            lowercased.contains("bad header mac") {
             return "解密失败：密码或私钥不匹配，请确认选择的密钥、输入的密码以及文件是否对应。"
         }
 
@@ -166,7 +174,8 @@ final class AgeEngineClient {
             "--output-dir", request.outputDirectory,
             "--auth", request.authArgument,
             "--secret-file", secretURL.path,
-            "--duplicate", request.duplicateStrategy.engineValue
+            "--duplicate", request.duplicateStrategy.engineValue,
+            "--concurrency", String(min(max(request.concurrency, 1), 12))
         ]
         switch request.command {
         case .encryptBatch(let outputName, let compress):
