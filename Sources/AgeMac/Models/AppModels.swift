@@ -104,7 +104,6 @@ enum AppTheme: String, Codable, CaseIterable, Identifiable {
     case rose
     case amber
     case graphite
-    case gaussian
 
     var id: String { rawValue }
 
@@ -116,7 +115,6 @@ enum AppTheme: String, Codable, CaseIterable, Identifiable {
         case .rose: "玫红"
         case .amber: "琥珀"
         case .graphite: "石墨"
-        case .gaussian: "高斯透明"
         }
     }
 }
@@ -201,6 +199,8 @@ struct AppSettings: Codable, Hashable {
     var compressEnabled: Bool
     var concurrency: Int
     var theme: AppTheme
+    var gaussianTransparencyEnabled: Bool
+    var gaussianTransparencyOpacity: Int
 
     static func defaults() -> AppSettings {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -209,7 +209,9 @@ struct AppSettings: Codable, Hashable {
             duplicateStrategy: .rename,
             compressEnabled: true,
             concurrency: 4,
-            theme: .teal
+            theme: .teal,
+            gaussianTransparencyEnabled: false,
+            gaussianTransparencyOpacity: 55
         )
     }
 
@@ -219,6 +221,8 @@ struct AppSettings: Codable, Hashable {
         case compressEnabled
         case concurrency
         case theme
+        case gaussianTransparencyEnabled
+        case gaussianTransparencyOpacity
     }
 
     init(
@@ -226,13 +230,17 @@ struct AppSettings: Codable, Hashable {
         duplicateStrategy: DuplicateStrategy,
         compressEnabled: Bool,
         concurrency: Int,
-        theme: AppTheme
+        theme: AppTheme,
+        gaussianTransparencyEnabled: Bool,
+        gaussianTransparencyOpacity: Int
     ) {
         self.outputDirectory = outputDirectory
         self.duplicateStrategy = duplicateStrategy
         self.compressEnabled = compressEnabled
         self.concurrency = concurrency
         self.theme = theme
+        self.gaussianTransparencyEnabled = gaussianTransparencyEnabled
+        self.gaussianTransparencyOpacity = Self.clampGaussianTransparencyOpacity(gaussianTransparencyOpacity)
     }
 
     init(from decoder: Decoder) throws {
@@ -242,7 +250,28 @@ struct AppSettings: Codable, Hashable {
         duplicateStrategy = try container.decodeIfPresent(DuplicateStrategy.self, forKey: .duplicateStrategy) ?? defaults.duplicateStrategy
         compressEnabled = try container.decodeIfPresent(Bool.self, forKey: .compressEnabled) ?? defaults.compressEnabled
         concurrency = try container.decodeIfPresent(Int.self, forKey: .concurrency) ?? defaults.concurrency
-        theme = try container.decodeIfPresent(AppTheme.self, forKey: .theme) ?? defaults.theme
+        let themeValue = try container.decodeIfPresent(String.self, forKey: .theme)
+        theme = themeValue.flatMap(AppTheme.init(rawValue:)) ?? defaults.theme
+        gaussianTransparencyEnabled = try container.decodeIfPresent(Bool.self, forKey: .gaussianTransparencyEnabled) ?? defaults.gaussianTransparencyEnabled
+        let opacity = try Self.decodeGaussianTransparencyOpacity(from: container, defaults: defaults)
+        gaussianTransparencyOpacity = Self.clampGaussianTransparencyOpacity(opacity)
+    }
+
+    private static func decodeGaussianTransparencyOpacity(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        defaults: AppSettings
+    ) throws -> Int {
+        if let intValue = try container.decodeIfPresent(Int.self, forKey: .gaussianTransparencyOpacity) {
+            return intValue
+        }
+        if let doubleValue = try container.decodeIfPresent(Double.self, forKey: .gaussianTransparencyOpacity) {
+            return Int((doubleValue * 100).rounded())
+        }
+        return defaults.gaussianTransparencyOpacity
+    }
+
+    static func clampGaussianTransparencyOpacity(_ value: Int) -> Int {
+        min(max(value, 0), 100)
     }
 }
 

@@ -26,21 +26,19 @@ struct GlassSurface: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
             content
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .background(inactiveFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(inactiveStroke, lineWidth: 1)
-                }
+                .glassEffect(.regular, in: cardShape)
+                .background(inactiveFill, in: cardShape)
+                .overlay { cardShape.stroke(inactiveStroke, lineWidth: 1) }
         } else {
             content
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .background(inactiveFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(activeStroke, lineWidth: 1)
-                }
+                .background(.regularMaterial, in: cardShape)
+                .background(inactiveFill, in: cardShape)
+                .overlay { cardShape.stroke(activeStroke, lineWidth: 1) }
         }
+    }
+
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
     }
 
     private var isInactive: Bool {
@@ -304,7 +302,6 @@ extension AppTheme {
         case .rose: .pink
         case .amber: .orange
         case .graphite: .gray
-        case .gaussian: Color(red: 0.26, green: 0.72, blue: 0.92)
         }
     }
 
@@ -316,7 +313,6 @@ extension AppTheme {
         case .rose: .orange
         case .amber: .blue
         case .graphite: .teal
-        case .gaussian: Color(red: 0.82, green: 0.56, blue: 0.94)
         }
     }
 

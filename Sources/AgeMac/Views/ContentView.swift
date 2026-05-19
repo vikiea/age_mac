@@ -11,11 +11,16 @@ struct ContentView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView(selection: $store.selectedSection)
-        } detail: {
-            ZStack {
-                DetailBackground(theme: store.settings.theme)
+        ZStack {
+            DetailBackground(
+                theme: store.settings.theme,
+                gaussianTransparencyEnabled: store.settings.gaussianTransparencyEnabled,
+                gaussianTransparencyOpacity: store.effectiveGaussianTransparencyOpacity
+            )
+
+            NavigationSplitView {
+                SidebarView(selection: $store.selectedSection)
+            } detail: {
                 DetailScrollContainer {
                     switch store.selectedSection ?? .encrypt {
                     case .encrypt:
@@ -32,8 +37,10 @@ struct ContentView: View {
                 }
                 .navigationTitle("Age Mac")
             }
+            .navigationSplitViewStyle(.balanced)
+            .background(Color.clear)
         }
-        .navigationSplitViewStyle(.balanced)
+        .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
         .alert("Age Mac", isPresented: Binding(
             get: { store.alertMessage != nil },
             set: { if !$0 { store.alertMessage = nil } }
@@ -80,9 +87,11 @@ private struct DetailScrollContainer<Content: View>: View {
 struct DetailBackground: View {
     @Environment(\.colorScheme) private var colorScheme
     var theme: AppTheme
+    var gaussianTransparencyEnabled: Bool = false
+    var gaussianTransparencyOpacity: Int = AppSettings.defaults().gaussianTransparencyOpacity
 
     var body: some View {
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, *), !gaussianTransparencyEnabled {
             background
                 .backgroundExtensionEffect()
         } else {
@@ -92,32 +101,27 @@ struct DetailBackground: View {
 
     private var background: some View {
         ZStack {
-            stableWindowBackground
-            if theme == .gaussian {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.24),
-                        theme.accentColor.opacity(colorScheme == .dark ? 0.14 : 0.11),
-                        theme.secondaryColor.opacity(colorScheme == .dark ? 0.12 : 0.09)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+            if gaussianTransparencyEnabled {
+                GaussianWindowBackdrop()
+                stableWindowBackground.opacity(stableBackgroundOpacity)
             } else {
-                LinearGradient(
-                    colors: [
-                        .clear,
-                        theme.accentColor.opacity(themeOpacity),
-                        theme.secondaryColor.opacity(themeOpacity)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                stableWindowBackground
             }
+            themeTint
         }
         .ignoresSafeArea()
+    }
+
+    private var themeTint: LinearGradient {
+        LinearGradient(
+            colors: [
+                gaussianTransparencyEnabled ? Color.white.opacity(gaussianOverlayOpacity(base: colorScheme == .dark ? 0.08 : 0.18)) : .clear,
+                theme.accentColor.opacity(gaussianTransparencyEnabled ? gaussianOverlayOpacity(base: colorScheme == .dark ? 0.16 : 0.13) : themeOpacity),
+                theme.secondaryColor.opacity(gaussianTransparencyEnabled ? gaussianOverlayOpacity(base: colorScheme == .dark ? 0.14 : 0.11) : themeOpacity)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     private var stableWindowBackground: Color {
@@ -131,6 +135,149 @@ struct DetailBackground: View {
 
     private var themeOpacity: Double {
         colorScheme == .dark ? 0.12 : 0.08
+    }
+
+    private var gaussianTransparencyFraction: Double {
+        Double(AppSettings.clampGaussianTransparencyOpacity(gaussianTransparencyOpacity)) / 100
+    }
+
+    private var stableBackgroundOpacity: Double {
+        1 - gaussianTransparencyFraction
+    }
+
+    private func gaussianOverlayOpacity(base: Double) -> Double {
+        base * stableBackgroundOpacity
+    }
+}
+
+extension View {
+    func gaussianWindowTranslucency(enabled: Bool) -> some View {
+        background(WindowTranslucencyConfigurator(isEnabled: enabled))
+    }
+}
+
+private struct GaussianWindowBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.isEmphasized = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = .hudWindow
+        nsView.blendingMode = .behindWindow
+        nsView.state = .active
+        nsView.isEmphasized = true
+    }
+}
+
+private struct WindowTranslucencyConfigurator: NSViewRepresentable {
+    var isEnabled: Bool
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        updateWindow(from: view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        updateWindow(from: nsView, coordinator: context.coordinator)
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.detachWindow()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    private func updateWindow(from view: NSView, coordinator: Coordinator) {
+        let isEnabled = isEnabled
+        DispatchQueue.main.async { [weak view, coordinator] in
+            coordinator.update(window: view?.window, isEnabled: isEnabled)
+        }
+    }
+
+    final class Coordinator {
+        private weak var configuredWindow: NSWindow?
+        private static var appliedWindows: Set<ObjectIdentifier> = []
+        private static var originalAppearances: [ObjectIdentifier: WindowAppearance] = [:]
+
+        func update(window: NSWindow?, isEnabled: Bool) {
+            guard let window else { return }
+
+            configuredWindow = window
+            if isEnabled {
+                applyTranslucency(to: window)
+            } else {
+                restoreWindow(window)
+            }
+        }
+
+        func restoreWindow() {
+            guard let window = configuredWindow else { return }
+            restoreWindow(window)
+        }
+
+        func detachWindow() {
+            configuredWindow = nil
+        }
+
+        private func restoreWindow(_ window: NSWindow) {
+            let key = ObjectIdentifier(window)
+            guard let originalAppearance = Self.originalAppearances[key] else {
+                Self.appliedWindows.remove(key)
+                return
+            }
+
+            updateWindowAppearance(for: window) {
+                window.isOpaque = originalAppearance.isOpaque
+                window.backgroundColor = originalAppearance.backgroundColor
+                window.titlebarAppearsTransparent = originalAppearance.titlebarAppearsTransparent
+            }
+            Self.originalAppearances[key] = nil
+            Self.appliedWindows.remove(key)
+        }
+
+        private func applyTranslucency(to window: NSWindow) {
+            let key = ObjectIdentifier(window)
+            if Self.originalAppearances[key] == nil {
+                Self.originalAppearances[key] = WindowAppearance(window: window)
+            }
+            guard !Self.appliedWindows.contains(key) else { return }
+
+            updateWindowAppearance(for: window) {
+                window.isOpaque = false
+                window.backgroundColor = .clear
+                window.titlebarAppearsTransparent = true
+            }
+            Self.appliedWindows.insert(key)
+        }
+
+        private func updateWindowAppearance(for window: NSWindow, _ updates: () -> Void) {
+            window.disableScreenUpdatesUntilFlush()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                context.allowsImplicitAnimation = false
+                updates()
+            }
+        }
+    }
+
+    private struct WindowAppearance {
+        var isOpaque: Bool
+        var backgroundColor: NSColor
+        var titlebarAppearsTransparent: Bool
+
+        init(window: NSWindow) {
+            isOpaque = window.isOpaque
+            backgroundColor = window.backgroundColor
+            titlebarAppearsTransparent = window.titlebarAppearsTransparent
+        }
     }
 }
 
@@ -172,6 +319,8 @@ struct SidebarView: View {
             .tag(section)
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
         .background(SidebarSelectionHighlightDisabler())
     }
 

@@ -85,7 +85,87 @@ struct SettingsView: View {
                         .help(theme.title)
                     }
                 }
+
+                Divider()
+
+                Toggle("高斯透明", isOn: $store.settings.gaussianTransparencyEnabled)
+                    .onChange(of: store.settings.gaussianTransparencyEnabled) { _, _ in store.saveSettings() }
+
+                if store.settings.gaussianTransparencyEnabled {
+                    GaussianTransparencyControl()
+                }
             }
+        }
+    }
+}
+
+private struct GaussianTransparencyControl: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var draftOpacity = Double(AppSettings.defaults().gaussianTransparencyOpacity)
+    @State private var isEditing = false
+    @State private var pendingSaveTask: Task<Void, Never>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("透明度")
+                Spacer()
+                Text("\(displayedOpacity)%")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Slider(
+                value: Binding(
+                    get: { draftOpacity },
+                    set: { newValue in
+                        let opacity = Int(newValue.rounded())
+                        draftOpacity = Double(opacity)
+                        store.previewGaussianTransparencyOpacity(opacity)
+                    }
+                ),
+                in: 0...100,
+                step: 1,
+                onEditingChanged: { editing in
+                    isEditing = editing
+                    if editing {
+                        pendingSaveTask?.cancel()
+                        draftOpacity = Double(store.settings.gaussianTransparencyOpacity)
+                    } else {
+                        commitSettledOpacity()
+                    }
+                }
+            )
+        }
+        .onAppear {
+            draftOpacity = Double(store.settings.gaussianTransparencyOpacity)
+        }
+        .onChange(of: store.settings.gaussianTransparencyOpacity) { _, newValue in
+            if !isEditing {
+                draftOpacity = Double(newValue)
+            }
+        }
+        .onDisappear {
+            pendingSaveTask?.cancel()
+            store.cancelGaussianTransparencyOpacityPreview()
+        }
+        .transaction { transaction in
+            transaction.disablesAnimations = true
+        }
+    }
+
+    private var displayedOpacity: Int {
+        Int(draftOpacity.rounded())
+    }
+
+    private func commitSettledOpacity() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            let opacity = Int(draftOpacity.rounded())
+            store.commitGaussianTransparencyOpacity(opacity)
+            draftOpacity = Double(store.settings.gaussianTransparencyOpacity)
         }
     }
 }

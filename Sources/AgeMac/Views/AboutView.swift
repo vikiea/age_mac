@@ -13,7 +13,11 @@ struct AboutView: View {
 
     var body: some View {
         ZStack {
-            DetailBackground(theme: store.settings.theme)
+            DetailBackground(
+                theme: store.settings.theme,
+                gaussianTransparencyEnabled: store.settings.gaussianTransparencyEnabled,
+                gaussianTransparencyOpacity: store.effectiveGaussianTransparencyOpacity
+            )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -53,6 +57,7 @@ struct AboutView: View {
             .scrollClipDisabled()
         }
         .frame(width: 580, height: 620)
+        .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
     }
 
     private var header: some View {

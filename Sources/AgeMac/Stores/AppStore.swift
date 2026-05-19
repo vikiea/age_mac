@@ -16,6 +16,7 @@ final class AppStore: ObservableObject {
     @Published var keys: [KeyEntry] = []
     @Published var operations: [OperationRecord] = []
     @Published var settings: AppSettings = .defaults()
+    @Published private(set) var renderedGaussianTransparencyOpacity = AppSettings.defaults().gaussianTransparencyOpacity
     @Published var currentTask: RunningOperation?
     @Published var alertMessage: String?
 
@@ -63,6 +64,10 @@ final class AppStore: ObservableObject {
 
     var decryptTask: RunningOperation? {
         task(for: .decrypt)
+    }
+
+    var effectiveGaussianTransparencyOpacity: Int {
+        renderedGaussianTransparencyOpacity
     }
 
     var canStartEncrypt: Bool {
@@ -363,8 +368,45 @@ final class AppStore: ObservableObject {
     }
 
     func saveSettings() {
-        settings.concurrency = min(max(settings.concurrency, 1), 12)
+        let clampedConcurrency = min(max(settings.concurrency, 1), 12)
+        if settings.concurrency != clampedConcurrency {
+            settings.concurrency = clampedConcurrency
+        }
+
+        let clampedOpacity = AppSettings.clampGaussianTransparencyOpacity(settings.gaussianTransparencyOpacity)
+        if settings.gaussianTransparencyOpacity != clampedOpacity {
+            settings.gaussianTransparencyOpacity = clampedOpacity
+        }
+        if renderedGaussianTransparencyOpacity != settings.gaussianTransparencyOpacity {
+            renderedGaussianTransparencyOpacity = settings.gaussianTransparencyOpacity
+        }
+
         saveState()
+    }
+
+    func previewGaussianTransparencyOpacity(_ opacity: Int) {
+        updateGaussianTransparencyOpacity(opacity)
+    }
+
+    func cancelGaussianTransparencyOpacityPreview() {
+        let clampedOpacity = AppSettings.clampGaussianTransparencyOpacity(settings.gaussianTransparencyOpacity)
+        guard renderedGaussianTransparencyOpacity != clampedOpacity else { return }
+        renderedGaussianTransparencyOpacity = clampedOpacity
+    }
+
+    func commitGaussianTransparencyOpacity(_ opacity: Int) {
+        updateGaussianTransparencyOpacity(opacity)
+        saveSettings()
+    }
+
+    private func updateGaussianTransparencyOpacity(_ opacity: Int) {
+        let clampedOpacity = AppSettings.clampGaussianTransparencyOpacity(opacity)
+        if renderedGaussianTransparencyOpacity != clampedOpacity {
+            renderedGaussianTransparencyOpacity = clampedOpacity
+        }
+        if settings.gaussianTransparencyOpacity != clampedOpacity {
+            settings.gaussianTransparencyOpacity = clampedOpacity
+        }
     }
 
     private func runOperation(
@@ -513,6 +555,7 @@ final class AppStore: ObservableObject {
         keys = state.keys
         operations = state.operations
         settings = state.settings
+        renderedGaussianTransparencyOpacity = settings.gaussianTransparencyOpacity
         selectedEncryptKeyID = keys.first?.id
         selectedDecryptKeyID = keys.first(where: { $0.hasPrivateKey })?.id
     }
