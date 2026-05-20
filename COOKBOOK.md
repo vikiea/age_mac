@@ -102,13 +102,13 @@ The script:
 1. Builds the Swift app for `arm64` and `x86_64`.
 2. Builds the Go engine for `arm64` and `amd64`.
 3. Stages three app bundles under `dist/`: `arm64`, `x86_64`, and `universal`.
-4. Creates three DMGs under `docs/releases/`:
+4. Creates three DMGs under `pages/releases/`:
    - `AgeMac-<version>-arm64.dmg`
    - `AgeMac-<version>-x86_64.dmg`
    - `AgeMac-<version>-universal.dmg`
 5. Signs the architecture-specific DMGs for Sparkle.
-6. Writes `docs/appcast-arm64.xml` and `docs/appcast-x86_64.xml`.
-7. Writes `docs/appcast.xml` as a lightweight index feed.
+6. Writes `pages/appcast-arm64.xml` and `pages/appcast-x86_64.xml`.
+7. Writes `pages/appcast.xml` as a lightweight index feed.
 8. Mounts each DMG, verifies the app signature, and checks the app and engine architecture slices.
 
 The legacy command is still supported and delegates to the same DMG flow:
@@ -139,7 +139,7 @@ https://github.com/vikiea/age_mac/releases/download/v<version>/AgeMac-<version>-
 
 ## GitHub Pages
 
-The `pages.yml` workflow publishes the `docs/` directory. After pushing to GitHub, enable Pages with GitHub Actions as the source if it is not already enabled.
+The `pages.yml` workflow publishes the `pages/` directory. After pushing to GitHub, enable Pages with GitHub Actions as the source if it is not already enabled.
 
 Public URLs:
 

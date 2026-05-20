@@ -82,7 +82,7 @@ Use `env -u GOROOT` for Go commands if your shell has a stale `GOROOT` from anot
 
 ## Release And Updates
 
-Age Mac uses Sparkle 2 for online updates. Architecture-specific appcasts are hosted from the `docs/` directory by GitHub Pages.
+Age Mac uses Sparkle 2 for online updates. Architecture-specific appcasts are hosted from the `pages/` directory by GitHub Pages.
 
 Key points:
 
@@ -90,7 +90,7 @@ Key points:
 - The Sparkle private EdDSA key stays in the local macOS Keychain or another private secret store.
 - DMG release assets and appcast entries are generated with `scripts/release/build_dmg_release.sh all`.
 - `scripts/sparkle/release_appcast.sh` is kept as a compatibility wrapper for the same DMG release flow.
-- GitHub Pages publishes `docs/appcast-arm64.xml` and `docs/appcast-x86_64.xml`.
+- GitHub Pages publishes `pages/appcast-arm64.xml` and `pages/appcast-x86_64.xml`.
 
 See [COOKBOOK.md](COOKBOOK.md) for detailed build, key, release, and appcast workflows.
 

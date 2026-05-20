@@ -13,4 +13,4 @@ Engine/age-engine
 *.tar.gz
 *.dmg
 private/
-docs/releases/
+pages/releases/

@@ -1,0 +1,896 @@
+<!--
+Copyright (c) 2026 vikiea <vikiea@users.noreply.github.com>
+This code is released under the MIT License.
+See LICENSE for details.
+-->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Age Mac - 本地优先的 macOS age 加解密应用</title>
+  <meta name="description" content="Age Mac 是一个原生 macOS age 文件加解密应用，支持本地流式加密、解密、密钥管理、历史记录和 Sparkle 更新。">
+  <meta name="theme-color" content="#f5f8f9">
+  <meta property="og:title" content="Age Mac">
+  <meta property="og:description" content="本地优先的 macOS age 文件加解密应用。">
+  <meta property="og:image" content="./assets/screenshot-encrypt-site.jpg">
+  <link rel="preload" as="image" href="./assets/screenshot-encrypt-site.jpg">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #101316;
+      --muted: #5f6872;
+      --quiet: #838b94;
+      --line: rgba(34, 40, 47, 0.12);
+      --line-strong: rgba(34, 40, 47, 0.2);
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-strong: rgba(255, 255, 255, 0.92);
+      --teal: #07a7b8;
+      --blue: #4179e8;
+      --amber: #f28c28;
+      --rose: #d94a72;
+      --graphite: #2f3740;
+      --page: #f5f8f9;
+      --shadow: 0 22px 70px rgba(35, 46, 55, 0.16);
+      --content: 1180px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      line-height: 1.55;
+      letter-spacing: 0;
+      background: var(--page);
+      color: var(--ink);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        linear-gradient(125deg, rgba(235, 249, 249, 0.96), rgba(247, 248, 252, 0.96) 46%, rgba(255, 246, 240, 0.96) 100%),
+        var(--page);
+      color: var(--ink);
+      font-size: 16px;
+    }
+
+    body::selection {
+      background: rgba(7, 167, 184, 0.18);
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: none;
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid rgba(34, 40, 47, 0.08);
+      background: rgba(245, 248, 249, 0.78);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+
+    .header-inner {
+      width: min(var(--content), calc(100% - 40px));
+      height: 70px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 760;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .brand img {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      box-shadow: 0 8px 18px rgba(7, 167, 184, 0.18);
+    }
+
+    .header-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .nav-link,
+    .button {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+    }
+
+    .nav-link {
+      padding: 8px 10px;
+    }
+
+    .nav-link:hover {
+      background: rgba(255, 255, 255, 0.62);
+      color: var(--ink);
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 16px;
+      font-weight: 720;
+      font-size: 14px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button.primary {
+      color: #ffffff;
+      background: linear-gradient(135deg, #098b99, #266fe8);
+      box-shadow: 0 14px 30px rgba(38, 111, 232, 0.22);
+    }
+
+    .button.primary:hover {
+      box-shadow: 0 18px 38px rgba(38, 111, 232, 0.28);
+    }
+
+    .button.secondary {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.72);
+      border-color: var(--line);
+    }
+
+    .button.secondary:hover {
+      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.94);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 76svh;
+      padding: 82px 0 64px;
+      border-bottom: 1px solid rgba(34, 40, 47, 0.08);
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(245, 248, 249, 0.98) 0%, rgba(245, 248, 249, 0.88) 36%, rgba(245, 248, 249, 0.38) 62%, rgba(245, 248, 249, 0.78) 100%),
+        linear-gradient(180deg, rgba(245, 248, 249, 0) 55%, rgba(245, 248, 249, 0.96) 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .hero-visual {
+      position: absolute;
+      right: max(-230px, -12vw);
+      bottom: 28px;
+      width: min(1040px, 74vw);
+      opacity: 0.94;
+      filter: drop-shadow(0 34px 70px rgba(42, 55, 68, 0.26));
+      z-index: 0;
+    }
+
+    .hero-visual img {
+      border-radius: 8px;
+      aspect-ratio: 1800 / 1177;
+      object-fit: cover;
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 2;
+      width: min(var(--content), calc(100% - 40px));
+      margin: 0 auto;
+      display: grid;
+      align-items: center;
+      min-height: 520px;
+    }
+
+    .hero-copy {
+      max-width: 620px;
+      padding: 18px 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #096d75;
+      font-weight: 760;
+      font-size: 13px;
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--teal), var(--amber));
+      box-shadow: 0 0 0 5px rgba(7, 167, 184, 0.1);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 68px;
+      line-height: 0.98;
+      font-weight: 820;
+      max-width: 520px;
+    }
+
+    .hero-lede {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 20px;
+      max-width: 560px;
+    }
+
+    .hero-actions {
+      margin-top: 32px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 30px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.58);
+    }
+
+    .section {
+      padding: 84px 0;
+    }
+
+    .section.alt {
+      background: rgba(255, 255, 255, 0.48);
+      border-top: 1px solid rgba(34, 40, 47, 0.08);
+      border-bottom: 1px solid rgba(34, 40, 47, 0.08);
+    }
+
+    .section-inner {
+      width: min(var(--content), calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .section-kicker {
+      color: #096d75;
+      font-weight: 760;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 34px;
+    }
+
+    .section-heading h2 {
+      font-size: 38px;
+      line-height: 1.12;
+      font-weight: 800;
+      max-width: 650px;
+    }
+
+    .section-heading p {
+      color: var(--muted);
+      font-size: 17px;
+      max-width: 430px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .feature-card {
+      min-height: 210px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 10px 28px rgba(35, 46, 55, 0.07);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .feature-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 38px;
+      height: 30px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .feature-tag.teal {
+      background: linear-gradient(135deg, var(--teal), #24c3a5);
+    }
+
+    .feature-tag.blue {
+      background: linear-gradient(135deg, var(--blue), #7e68ee);
+    }
+
+    .feature-tag.amber {
+      background: linear-gradient(135deg, var(--amber), #e65f4d);
+    }
+
+    .feature-tag.rose {
+      background: linear-gradient(135deg, var(--rose), #6c63d9);
+    }
+
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 780;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .split-showcase {
+      display: grid;
+      grid-template-columns: 1.02fr 0.98fr;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .showcase-copy {
+      padding-right: 18px;
+    }
+
+    .showcase-copy h2 {
+      font-size: 36px;
+      line-height: 1.12;
+      font-weight: 800;
+      margin-bottom: 18px;
+    }
+
+    .showcase-copy p {
+      color: var(--muted);
+      font-size: 17px;
+      margin-bottom: 22px;
+    }
+
+    .capability-list {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .capability-list li {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      align-items: start;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .check {
+      width: 22px;
+      height: 22px;
+      border-radius: 8px;
+      background: rgba(7, 167, 184, 0.12);
+      border: 1px solid rgba(7, 167, 184, 0.28);
+      position: relative;
+      margin-top: 1px;
+    }
+
+    .check::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 4px;
+      left: 6px;
+      top: 6px;
+      border-left: 2px solid #078a97;
+      border-bottom: 2px solid #078a97;
+      transform: rotate(-45deg);
+    }
+
+    .screenshot-frame {
+      border: 1px solid rgba(34, 40, 47, 0.1);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .screenshot-frame img {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1800 / 1177;
+      object-fit: cover;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .shot {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface-strong);
+      box-shadow: 0 14px 34px rgba(35, 46, 55, 0.08);
+    }
+
+    .shot img {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1800 / 1177;
+      object-fit: cover;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .shot figcaption {
+      padding: 14px 16px 16px;
+    }
+
+    .shot strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 5px;
+    }
+
+    .shot span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .privacy-band {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .privacy-panel,
+    .download-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      background: var(--surface-strong);
+      box-shadow: 0 16px 40px rgba(35, 46, 55, 0.08);
+    }
+
+    .privacy-panel h2,
+    .download-panel h2 {
+      font-size: 28px;
+      line-height: 1.16;
+      margin-bottom: 12px;
+    }
+
+    .privacy-panel p,
+    .download-panel p {
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .download-options {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .download-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(247, 249, 250, 0.84);
+      font-weight: 700;
+    }
+
+    .download-option:hover {
+      border-color: rgba(7, 167, 184, 0.38);
+      background: rgba(240, 250, 250, 0.92);
+    }
+
+    .download-option span {
+      color: var(--quiet);
+      font-size: 13px;
+      font-weight: 640;
+    }
+
+    .footer {
+      padding: 28px 0 44px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .footer-inner {
+      width: min(var(--content), calc(100% - 40px));
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      border-top: 1px solid var(--line);
+      padding-top: 20px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .text-link {
+      color: #087885;
+      font-weight: 680;
+    }
+
+    .text-link:hover {
+      color: #055f68;
+    }
+
+    @media (max-width: 980px) {
+      .header-inner {
+        height: auto;
+        padding: 14px 0;
+        align-items: flex-start;
+      }
+
+      .header-links {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .hero {
+        min-height: 0;
+        padding: 58px 0 42px;
+      }
+
+      .hero::before {
+        background:
+          linear-gradient(180deg, rgba(245, 248, 249, 0.98) 0%, rgba(245, 248, 249, 0.88) 54%, rgba(245, 248, 249, 0.98) 100%);
+      }
+
+      .hero-inner {
+        min-height: 0;
+      }
+
+      .hero-visual {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        width: min(900px, calc(100% - 22px));
+        margin: 34px auto 0;
+      }
+
+      h1 {
+        font-size: 54px;
+      }
+
+      .feature-grid,
+      .gallery,
+      .privacy-band,
+      .split-showcase {
+        grid-template-columns: 1fr;
+      }
+
+      .section-heading {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .showcase-copy {
+        padding-right: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .header-inner,
+      .section-inner,
+      .footer-inner,
+      .hero-inner {
+        width: min(100% - 28px, var(--content));
+      }
+
+      .site-header {
+        position: relative;
+      }
+
+      .header-inner {
+        display: grid;
+      }
+
+      .header-links {
+        justify-content: flex-start;
+      }
+
+      .header-links .nav-link:nth-of-type(2),
+      .header-links .nav-link:nth-of-type(3) {
+        display: none;
+      }
+
+      .hero {
+        padding-top: 38px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .hero-lede {
+        font-size: 18px;
+      }
+
+      .section {
+        padding: 60px 0;
+      }
+
+      .section-heading h2,
+      .showcase-copy h2 {
+        font-size: 30px;
+      }
+
+      .privacy-panel h2,
+      .download-panel h2 {
+        font-size: 24px;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .footer-inner {
+        display: grid;
+      }
+
+      .footer-links {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="./" aria-label="Age Mac 首页">
+        <img src="./assets/app-icon.png" width="68" height="68" alt="">
+        <span>Age Mac</span>
+      </a>
+      <nav class="header-links" aria-label="主导航">
+        <a class="nav-link" href="#features">能力</a>
+        <a class="nav-link" href="#screenshots">截图</a>
+        <a class="nav-link" href="./privacy/">隐私</a>
+        <a class="button secondary" href="https://github.com/vikiea/age_mac">GitHub</a>
+        <a class="button primary" href="https://github.com/vikiea/age_mac/releases/download/v1.1.1/AgeMac-1.1.1-universal.dmg">下载</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-visual" aria-hidden="true">
+        <img src="./assets/screenshot-encrypt-site.jpg" width="1800" height="1177" alt="">
+      </div>
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="status-dot"></span>macOS 原生 age 工具</div>
+          <h1 id="hero-title">Age Mac</h1>
+          <p class="hero-lede">本地优先的文件加密和解密应用。选择文件，使用密码或 X25519 age 密钥保护内容，查看进度，并把历史和密钥留在自己的 Mac 上。</p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/vikiea/age_mac/releases/download/v1.1.1/AgeMac-1.1.1-universal.dmg">下载 Universal DMG</a>
+            <a class="button secondary" href="#screenshots">查看关键页面</a>
+          </div>
+          <div class="hero-meta" aria-label="核心信息">
+            <span class="meta-pill">macOS 14+</span>
+            <span class="meta-pill">age 文件格式</span>
+            <span class="meta-pill">本地流式处理</span>
+            <span class="meta-pill">MIT License</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-inner">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">核心能力</p>
+            <h2>把日常文件加密流程做成一套桌面工作台。</h2>
+          </div>
+          <p>Age Mac 将 SwiftUI 原生界面和 Go 流式 age 引擎组合在一起，适合处理资料夹、发布包、合作交付件和本机密钥。</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-tag teal">01</span>
+            <h3>批量打包加密</h3>
+            <p>多个文件可合成为一个 `.tar.gz.age` 或 `.tar.age` 归档，也可以按文件分别输出加密包。</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-tag blue">02</span>
+            <h3>自动解密展开</h3>
+            <p>解密 `.age` 文件后自动识别 tar 和 tar.gz 内容，输出到本机目录，减少重复手工步骤。</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-tag amber">03</span>
+            <h3>密钥本地管理</h3>
+            <p>生成、导入、重命名、查看和导出 X25519 age 密钥；查看或导出私钥时使用 macOS 本机验证。</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-tag rose">04</span>
+            <h3>任务与历史记录</h3>
+            <p>长期任务可查看进度，完成后保留本机历史和输出位置，方便回到 Finder 检查结果。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="section-inner">
+        <div class="split-showcase">
+          <div class="showcase-copy">
+            <p class="section-kicker">桌面原生体验</p>
+            <h2>熟悉的 macOS 控件，服务真正的文件工作。</h2>
+            <p>应用使用侧边栏、工具栏按钮、AppKit 文件面板、键盘快捷键和 Finder reveal 操作。界面采用系统材料和 Liquid Glass 风格，保持清爽，但不牺牲可扫读的信息密度。</p>
+            <ul class="capability-list">
+              <li><span class="check"></span><span>选择文件或文件夹，输出到固定的 `encrypted` 和 `decrypted` 目录。</span></li>
+              <li><span class="check"></span><span>支持密码模式和公钥/私钥模式，在一个界面中切换。</span></li>
+              <li><span class="check"></span><span>压缩、并发上限、同名文件策略和主题都可在设置里调整。</span></li>
+            </ul>
+          </div>
+          <div class="screenshot-frame">
+            <img src="./assets/screenshot-settings-site.jpg" width="1800" height="1177" loading="lazy" alt="Age Mac 设置页截图，展示输出目录、任务并发、压缩和主题设置">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="screenshots">
+      <div class="section-inner">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">关键页面截图</p>
+            <h2>从加密、解密到密钥和历史，重要流程都在一个窗口里。</h2>
+          </div>
+          <p>以下截图来自 Age Mac 本地演示数据环境，展示真实 SwiftUI 界面与 macOS 窗口效果。</p>
+        </div>
+
+        <div class="gallery">
+          <figure class="shot">
+            <img src="./assets/screenshot-encrypt-site.jpg" width="1800" height="1177" loading="lazy" alt="Age Mac 加密页截图，展示打包、压缩、密码和输入文件区域">
+            <figcaption>
+              <strong>加密</strong>
+              <span>打包或分别加密，支持压缩、密码和 age 公钥。</span>
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="./assets/screenshot-decrypt-site.jpg" width="1800" height="1177" loading="lazy" alt="Age Mac 解密页截图，展示密码或私钥解密和 .age 文件选择">
+            <figcaption>
+              <strong>解密</strong>
+              <span>解密 `.age` 文件，并在可能时自动展开归档内容。</span>
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="./assets/screenshot-keys-site.jpg" width="1800" height="1177" loading="lazy" alt="Age Mac 密钥页截图，展示已保存密钥和手动导入区域">
+            <figcaption>
+              <strong>密钥</strong>
+              <span>生成、导入、重命名、查看和导出本地 age 密钥。</span>
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="./assets/screenshot-history-site.jpg" width="1800" height="1177" loading="lazy" alt="Age Mac 历史页截图，展示本地加密和解密操作记录">
+            <figcaption>
+              <strong>历史</strong>
+              <span>保留任务结果、输出数量和 Finder 跳转入口。</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="section-inner privacy-band">
+        <article class="privacy-panel">
+          <p class="section-kicker">本地隐私边界</p>
+          <h2>文件、密码、私钥和历史默认不离开这台 Mac。</h2>
+          <p>Age Mac 不上传文件、遥测、密钥或操作历史。启用或触发更新检查时，Sparkle 只读取 GitHub Pages 上公开的 appcast 元数据。</p>
+          <a class="text-link" href="./privacy/">阅读隐私政策</a>
+        </article>
+
+        <article class="download-panel" id="download">
+          <p class="section-kicker">下载</p>
+          <h2>选择适合当前 Mac 的 DMG。</h2>
+          <p>Universal 版本适合大多数用户；也可以按 Apple Silicon 或 Intel 架构下载更小的安装包。</p>
+          <div class="download-options">
+            <a class="download-option" href="https://github.com/vikiea/age_mac/releases/download/v1.1.1/AgeMac-1.1.1-universal.dmg">Universal <span>Apple Silicon + Intel</span></a>
+            <a class="download-option" href="https://github.com/vikiea/age_mac/releases/download/v1.1.1/AgeMac-1.1.1-arm64.dmg">Apple Silicon <span>arm64</span></a>
+            <a class="download-option" href="https://github.com/vikiea/age_mac/releases/download/v1.1.1/AgeMac-1.1.1-x86_64.dmg">Intel <span>x86_64</span></a>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <p>Age Mac is released under the MIT License.</p>
+      <div class="footer-links">
+        <a class="text-link" href="https://github.com/vikiea/age_mac">GitHub</a>
+        <a class="text-link" href="./appcast-arm64.xml">Apple Silicon appcast</a>
+        <a class="text-link" href="./appcast-x86_64.xml">Intel appcast</a>
+        <a class="text-link" href="https://github.com/vikiea/age_mac/blob/main/LICENSE">License</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

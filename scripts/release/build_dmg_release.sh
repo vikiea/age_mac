@@ -17,10 +17,11 @@ RELEASE_BASE_URL="https://github.com/vikiea/age_mac/releases/download/v$BUNDLE_V
 
 ENGINE_DIR="$ROOT_DIR/Engine"
 DIST_DIR="$ROOT_DIR/dist"
-RELEASE_DIR="$ROOT_DIR/docs/releases"
-APPCAST_MAIN="$ROOT_DIR/docs/appcast.xml"
-APPCAST_ARM64="$ROOT_DIR/docs/appcast-arm64.xml"
-APPCAST_X86_64="$ROOT_DIR/docs/appcast-x86_64.xml"
+PAGES_DIR="$ROOT_DIR/pages"
+RELEASE_DIR="$PAGES_DIR/releases"
+APPCAST_MAIN="$PAGES_DIR/appcast.xml"
+APPCAST_ARM64="$PAGES_DIR/appcast-arm64.xml"
+APPCAST_X86_64="$PAGES_DIR/appcast-x86_64.xml"
 APP_ICON_NAME="AgeMacIcon"
 APP_ICON_SOURCE="$ROOT_DIR/Resources/AppIcon.icns"
 

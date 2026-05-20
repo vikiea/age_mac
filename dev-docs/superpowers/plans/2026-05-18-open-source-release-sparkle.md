@@ -24,9 +24,9 @@ See LICENSE for details.
 - Create: `LICENSE`
 - Create: `THIRD_PARTY_NOTICES.md`
 - Create: `PRIVACY.md`
-- Create: `docs/index.md`
-- Create: `docs/privacy/index.md`
-- Create: `docs/appcast.xml`
+- Create: `pages/index.md`
+- Create: `pages/privacy/index.md`
+- Create: `pages/appcast.xml`
 
 - [ ] **Step 1: Rewrite README with project overview**
 
@@ -42,7 +42,7 @@ Add MIT `LICENSE`, `THIRD_PARTY_NOTICES.md`, and `PRIVACY.md`. State that Age Ma
 
 - [ ] **Step 4: Add Pages content**
 
-Add `docs/index.md`, `docs/privacy/index.md`, and a placeholder `docs/appcast.xml` that Sparkle can read safely before the first release.
+Add `pages/index.md`, `pages/privacy/index.md`, and a placeholder `pages/appcast.xml` that Sparkle can read safely before the first release.
 
 ### Task 2: Sparkle Update Integration
 
@@ -125,7 +125,7 @@ Use `#` comments for shell/YAML/TOML and HTML comments for Markdown. Do not edit
 
 - [ ] **Step 1: Add Pages workflow**
 
-Publish the `docs/` directory as a static GitHub Pages site via Actions.
+Publish the `pages/` directory as a static GitHub Pages site via Actions.
 
 - [ ] **Step 2: Add verification workflow**
 
@@ -166,5 +166,5 @@ Set the remote to `https://github.com/vikiea/age_mac.git` if missing, push `main
 ## Self-Review
 
 - Spec coverage: documentation, license, privacy, copyright headers, GitHub Pages, About screen, and Sparkle update checking are each covered by a task.
-- Placeholder scan: no placeholder tasks remain; the only intentionally placeholder runtime artifact is `docs/appcast.xml`, which is a valid pre-release feed.
+- Placeholder scan: no placeholder tasks remain; the only intentionally placeholder runtime artifact is `pages/appcast.xml`, which is a valid pre-release feed.
 - Type consistency: `UpdateService`, `AppLinks`, and `AboutView` are named consistently across tasks.
