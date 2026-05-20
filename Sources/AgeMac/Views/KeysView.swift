@@ -10,27 +10,33 @@ struct KeysView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        PageHeader(title: "密钥", subtitle: "生成、导入并管理本地 X25519 age 密钥", systemImage: "key.fill")
+        let strings = store.strings
+
+        PageHeader(
+            title: AppSection.keys.title(in: store.settings.language),
+            subtitle: strings.keysSubtitle,
+            systemImage: "key.fill"
+        )
 
         GlassCard {
             HStack {
-                Label("已保存密钥", systemImage: "key.horizontal")
+                Label(strings.keysTitle, systemImage: "key.horizontal")
                     .font(.headline)
                 Spacer()
                 Button {
                     store.importKeyFromFile()
                 } label: {
-                    Label("从文件导入", systemImage: "square.and.arrow.down")
+                    Label(strings.importFromFile, systemImage: "square.and.arrow.down")
                 }
                 Button {
                     store.generateKeyPair()
                 } label: {
-                    Label("生成密钥", systemImage: "sparkles")
+                    Label(strings.generateKey, systemImage: "sparkles")
                 }
             }
 
             if store.keys.isEmpty {
-                ContentUnavailableView("没有密钥", systemImage: "key", description: Text("生成或导入一个 age 密钥"))
+                ContentUnavailableView(strings.noKeysTitle, systemImage: "key", description: Text(strings.noKeysDescription))
                     .frame(maxWidth: .infinity, minHeight: 150)
             } else {
                 ForEach(store.keys) { key in
@@ -41,14 +47,14 @@ struct KeysView: View {
         }
 
         GlassCard {
-            Label("手动导入", systemImage: "keyboard")
+            Label(strings.manualImport, systemImage: "keyboard")
                 .font(.headline)
-            TextField("名称", text: $store.importKeyName)
+            TextField(strings.keyName, text: $store.importKeyName)
                 .textFieldStyle(.roundedBorder)
-            TextField("公钥", text: $store.importPublicKey, axis: .vertical)
+            TextField(strings.publicKey, text: $store.importPublicKey, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...4)
-            TextField("私钥（可选）", text: $store.importPrivateKey, axis: .vertical)
+            TextField(strings.privateKeyOptional, text: $store.importPrivateKey, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...4)
             HStack {
@@ -56,7 +62,7 @@ struct KeysView: View {
                 Button {
                     store.importKey()
                 } label: {
-                    Label("导入", systemImage: "plus.circle")
+                    Label(strings.importKey, systemImage: "plus.circle")
                 }
             }
         }
@@ -78,7 +84,7 @@ private struct KeyRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 5) {
-                    TextField("密钥名称", text: $draftName)
+                    TextField(store.strings.keyName, text: $draftName)
                         .font(.headline)
                         .textFieldStyle(.plain)
                         .focused($nameFocused)
@@ -88,13 +94,13 @@ private struct KeyRowView: View {
                                 saveName()
                             }
                         }
-                    Text(AppFormatters.dateTime.string(from: key.createdAt))
+                    Text(AppFormatters.dateTime(key.createdAt, language: store.settings.language))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 if key.hasPrivateKey {
-                    Label("含私钥", systemImage: "checkmark.seal.fill")
+                    Label(store.strings.hasPrivateKey, systemImage: "checkmark.seal.fill")
                         .font(.caption)
                         .foregroundStyle(.green)
                 }
@@ -121,7 +127,7 @@ private struct KeyRowView: View {
             }
             .buttonStyle(.borderless)
             .disabled(!key.hasPrivateKey)
-            .help("验证后导出密钥")
+            .help(store.strings.exportKeyHelp)
 
             Button {
                 store.revealPrivateKey(key)
@@ -130,7 +136,7 @@ private struct KeyRowView: View {
             }
             .buttonStyle(.borderless)
             .disabled(!key.hasPrivateKey)
-            .help("验证后查看私钥")
+            .help(store.strings.revealPrivateKeyHelp)
 
             Button {
                 store.deleteKey(key)
@@ -138,7 +144,7 @@ private struct KeyRowView: View {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
-            .help("删除")
+            .help(store.strings.delete)
         }
     }
 

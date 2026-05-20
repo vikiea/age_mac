@@ -10,7 +10,13 @@ struct DecryptView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        PageHeader(title: "解密", subtitle: "解密 .age 文件并自动展开 tar 或 tar.gz 内容", systemImage: "lock.open.fill")
+        let strings = store.strings
+
+        PageHeader(
+            title: AppSection.decrypt.title(in: store.settings.language),
+            subtitle: strings.decryptSubtitle,
+            systemImage: "lock.open.fill"
+        )
 
         TaskStatusCard(task: store.decryptTask) {
             store.removeCurrentTask(kind: .decrypt)
@@ -20,12 +26,12 @@ struct DecryptView: View {
             authModePicker
 
             if store.decryptAuthMode == .passphrase {
-                SecureField("密码", text: $store.decryptPassphrase)
+                SecureField(strings.passphrase, text: $store.decryptPassphrase)
                     .textFieldStyle(.roundedBorder)
             } else {
-                KeyPicker(title: "已保存私钥", keys: store.keys, selection: $store.selectedDecryptKeyID, requiresPrivateKey: true)
+                KeyPicker(title: strings.savedPrivateKeys, keys: store.keys, selection: $store.selectedDecryptKeyID, requiresPrivateKey: true)
                 if store.selectedDecryptKeyID == nil {
-                    TextField("或粘贴 age 私钥", text: $store.privateKeyInput)
+                    TextField(strings.pastePrivateKeyPlaceholder(), text: $store.privateKeyInput)
                         .textFieldStyle(.roundedBorder)
                         .textSelection(.enabled)
                 }
@@ -34,20 +40,20 @@ struct DecryptView: View {
 
         GlassCard {
             HStack {
-                Label("输入文件", systemImage: "tray.and.arrow.down")
+                Label(strings.inputFiles, systemImage: "tray.and.arrow.down")
                     .font(.headline)
                 Spacer()
                 Button {
                     store.chooseDecryptFiles()
                 } label: {
-                    Label("添加 .age", systemImage: "plus")
+                    Label(strings.addEncryptedAge, systemImage: "plus")
                 }
                 Button {
                     store.chooseDecryptFolder()
                 } label: {
-                    Label("扫描文件夹", systemImage: "folder.badge.plus")
+                    Label(strings.scanFolder, systemImage: "folder.badge.plus")
                 }
-                Button("清空") {
+                Button(strings.clear) {
                     store.clearDecryptFiles()
                 }
                 .disabled(store.decryptFiles.isEmpty)
@@ -58,8 +64,8 @@ struct DecryptView: View {
             }
 
             PrimaryActionCell(
-                title: "开始解密",
-                subtitle: "输出到 \(AppFormatters.shortPath(store.settings.outputDirectory))/decrypted",
+                title: strings.startDecrypt,
+                subtitle: strings.decryptedOutputSubtitle(AppFormatters.shortPath(store.settings.outputDirectory)),
                 systemImage: "lock.open.fill",
                 disabled: !store.canStartDecrypt
             ) {
@@ -70,9 +76,9 @@ struct DecryptView: View {
     }
 
     private var authModePicker: some View {
-        Picker("解密方式", selection: $store.decryptAuthMode) {
+        Picker(store.strings.decryptMethod, selection: $store.decryptAuthMode) {
             ForEach(AuthMode.allCases) { mode in
-                Text(mode.title).tag(mode)
+                Text(mode.title(in: store.settings.language)).tag(mode)
             }
         }
         .pickerStyle(.segmented)

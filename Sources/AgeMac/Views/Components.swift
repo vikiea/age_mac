@@ -85,12 +85,13 @@ struct PageHeader: View {
 }
 
 struct FileListView: View {
+    @EnvironmentObject private var store: AppStore
     var files: [SelectedFile]
     var onRemove: (SelectedFile) -> Void
 
     var body: some View {
         if files.isEmpty {
-            ContentUnavailableView("没有文件", systemImage: "doc.badge.plus", description: Text("使用上方按钮添加文件"))
+            ContentUnavailableView(store.strings.noFilesTitle, systemImage: "doc.badge.plus", description: Text(store.strings.noFilesDescription))
                 .frame(maxWidth: .infinity, minHeight: 180)
         } else {
             List(files) { file in
@@ -101,7 +102,7 @@ struct FileListView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(file.name)
                             .lineLimit(1)
-                        Text("\(AppFormatters.fileSize(file.size)) · \(AppFormatters.shortPath(file.path))")
+                        Text("\(AppFormatters.fileSize(file.size, language: store.settings.language)) · \(AppFormatters.shortPath(file.path))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -113,7 +114,7 @@ struct FileListView: View {
                         Image(systemName: "xmark")
                     }
                     .buttonStyle(.borderless)
-                    .help("移除")
+                    .help(store.strings.remove())
                 }
                 .padding(.vertical, 3)
             }
@@ -134,7 +135,7 @@ struct TaskStatusCard: View {
                     Label(task.title, systemImage: task.kind.systemImage)
                         .font(.headline)
                     Spacer()
-                    Text(task.status.title)
+                    Text(task.status.title(in: store.settings.language))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(statusColor(task.status))
                     if task.status != .running {
@@ -144,7 +145,7 @@ struct TaskStatusCard: View {
                             Image(systemName: "xmark.circle")
                         }
                         .buttonStyle(.borderless)
-                        .help("删除结果")
+                        .help(store.strings.deleteResult)
                     }
                 }
 
@@ -196,7 +197,7 @@ struct TaskStatusCard: View {
                     Button(role: .destructive) {
                         store.cancelCurrentTask()
                     } label: {
-                        Label("取消任务", systemImage: "stop.circle")
+                        Label(store.strings.cancelTask, systemImage: "stop.circle")
                     }
                 }
             }
@@ -325,6 +326,7 @@ extension AppTheme {
 }
 
 struct KeyPicker: View {
+    @EnvironmentObject private var store: AppStore
     var title: String
     var keys: [KeyEntry]
     @Binding var selection: UUID?
@@ -336,7 +338,7 @@ struct KeyPicker: View {
 
     var body: some View {
         Picker(title, selection: $selection) {
-            Text("不使用已保存密钥").tag(UUID?.none)
+            Text(store.strings.noKeySelection).tag(UUID?.none)
             ForEach(eligibleKeys) { key in
                 Text(key.name).tag(Optional(key.id))
             }

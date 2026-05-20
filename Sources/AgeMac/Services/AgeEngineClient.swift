@@ -28,6 +28,7 @@ struct EngineRequest {
     var secret: String
     var duplicateStrategy: DuplicateStrategy
     var concurrency: Int
+    var language: AppLanguage
 }
 
 enum EngineClientError: LocalizedError {
@@ -35,60 +36,84 @@ enum EngineClientError: LocalizedError {
     case processFailed(String, userMessage: String? = nil)
     case invalidKeygenOutput
 
-    var errorDescription: String? {
+    func errorDescription(in language: AppLanguage) -> String {
         switch self {
-        case .engineMissing(let url): "找不到 age 引擎: \(url.path)"
+        case .engineMissing(let url):
+            language == .english ? "Cannot find age engine: \(url.path)" : "找不到 age 引擎: \(url.path)"
         case .processFailed(let message, let userMessage): userMessage ?? message
-        case .invalidKeygenOutput: "密钥生成输出无效"
+        case .invalidKeygenOutput:
+            language == .english ? "Key generation output is invalid" : "密钥生成输出无效"
         }
+    }
+
+    var errorDescription: String? {
+        errorDescription(in: .english)
     }
 }
 
 enum EngineErrorPresenter {
-    static func userMessage(for rawMessage: String, command: EngineCommand) -> String {
+    static func userMessage(for rawMessage: String, command: EngineCommand, language: AppLanguage) -> String {
         let lowercased = rawMessage.lowercased()
 
         if lowercased.contains("encrypted file is incomplete or corrupted") ||
             lowercased.contains("failed to decrypt and authenticate payload chunk") ||
             lowercased.contains("unexpected eof") ||
             lowercased.contains("trailing data after end of encrypted file") {
-            return "解密失败：文件不完整、已损坏，或加密输出未完整写入。请确认原始 .age 文件完整后重试。"
+            return language == .english
+                ? "Decrypt failed: the file is incomplete, corrupted, or the encrypted output was not fully written. Verify the original .age file and try again."
+                : "解密失败：文件不完整、已损坏，或加密输出未完整写入。请确认原始 .age 文件完整后重试。"
         }
 
         if lowercased.contains("no identity matched any of the recipients") ||
             lowercased.contains("incorrect passphrase") ||
             lowercased.contains("bad header mac") {
-            return "解密失败：密码或私钥不匹配，请确认选择的密钥、输入的密码以及文件是否对应。"
+            return language == .english
+                ? "Decrypt failed: the passphrase or private key does not match this file."
+                : "解密失败：密码或私钥不匹配，请确认选择的密钥、输入的密码以及文件是否对应。"
         }
 
         if lowercased.contains("malformed age file") ||
             lowercased.contains("not an age file") ||
             lowercased.contains("invalid armor") {
-            return "解密失败：文件不是有效的 age 加密文件，或文件内容已经损坏。"
+            return language == .english
+                ? "Decrypt failed: this is not a valid age file, or the file content is corrupted."
+                : "解密失败：文件不是有效的 age 加密文件，或文件内容已经损坏。"
         }
 
         if lowercased.contains("permission denied") {
-            return "操作失败：没有足够权限读取输入文件或写入输出目录，请检查文件权限。"
+            return language == .english
+                ? "Operation failed: there is not enough permission to read input files or write to the output folder."
+                : "操作失败：没有足够权限读取输入文件或写入输出目录，请检查文件权限。"
         }
 
         if lowercased.contains("no such file or directory") || lowercased.contains("file does not exist") {
-            return "操作失败：有文件不存在或已被移动，请重新选择文件后再试。"
+            return language == .english
+                ? "Operation failed: a file does not exist or has been moved. Choose the files again and retry."
+                : "操作失败：有文件不存在或已被移动，请重新选择文件后再试。"
         }
 
         if lowercased.contains("no space left on device") {
-            return "操作失败：磁盘空间不足，请清理空间或更换输出目录后再试。"
+            return language == .english
+                ? "Operation failed: there is not enough disk space. Free space or choose another output folder."
+                : "操作失败：磁盘空间不足，请清理空间或更换输出目录后再试。"
         }
 
         if lowercased.contains("unsafe archive path") {
-            return "解密失败：归档中包含不安全的文件路径，已阻止写入。"
+            return language == .english
+                ? "Decrypt failed: the archive contains an unsafe file path and was blocked."
+                : "解密失败：归档中包含不安全的文件路径，已阻止写入。"
         }
 
         if lowercased.contains("all files failed to encrypt") {
-            return "加密失败：所有文件都没有成功处理，请检查输入文件和输出目录。"
+            return language == .english
+                ? "Encrypt failed: no files were processed successfully. Check the input files and output folder."
+                : "加密失败：所有文件都没有成功处理，请检查输入文件和输出目录。"
         }
 
         if lowercased.contains("all files failed to decrypt") {
-            return "解密失败：所有文件都没有成功处理，请检查密码、私钥或文件格式。"
+            return language == .english
+                ? "Decrypt failed: no files were processed successfully. Check the passphrase, private key, or file format."
+                : "解密失败：所有文件都没有成功处理，请检查密码、私钥或文件格式。"
         }
 
         switch command {
@@ -114,7 +139,7 @@ final class AgeEngineClient {
         return cwd.appendingPathComponent("Engine/age-engine")
     }
 
-    func generateKeyPair() throws -> KeyEntry {
+    func generateKeyPair(language: AppLanguage) throws -> KeyEntry {
         let engine = engineURL
         guard FileManager.default.isExecutableFile(atPath: engine.path) else {
             throw EngineClientError.engineMissing(engine)
@@ -133,7 +158,7 @@ final class AgeEngineClient {
         let data = stdout.fileHandleForReading.readDataToEndOfFile()
         if process.terminationStatus != 0 {
             let message = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "keygen failed"
-            throw EngineClientError.processFailed(message, userMessage: EngineErrorPresenter.userMessage(for: message, command: .decrypt))
+            throw EngineClientError.processFailed(message, userMessage: EngineErrorPresenter.userMessage(for: message, command: .decrypt, language: language))
         }
         guard let event = try? decoder.decode(EngineEvent.self, from: data),
               let publicKey = event.publicKey,
@@ -237,7 +262,7 @@ final class AgeEngineClient {
                     }
                     resumeOnce(.failure(EngineClientError.processFailed(
                         message,
-                        userMessage: EngineErrorPresenter.userMessage(for: message, command: request.command)
+                        userMessage: EngineErrorPresenter.userMessage(for: message, command: request.command, language: request.language)
                     )))
                 }
             }

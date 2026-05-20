@@ -10,35 +10,41 @@ struct HistoryView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        PageHeader(title: "历史", subtitle: "查看本机加密和解密操作记录", systemImage: "clock.arrow.circlepath")
+        let strings = store.strings
+
+        PageHeader(
+            title: AppSection.history.title(in: store.settings.language),
+            subtitle: strings.historySubtitle,
+            systemImage: "clock.arrow.circlepath"
+        )
 
         GlassCard {
             HStack {
-                Label("操作记录", systemImage: "list.bullet.rectangle")
+                Label(strings.historyTitle, systemImage: "list.bullet.rectangle")
                     .font(.headline)
                 Spacer()
                 Button(role: .destructive) {
                     store.clearHistory()
                 } label: {
-                    Label("清空", systemImage: "trash")
+                    Label(strings.clear, systemImage: "trash")
                 }
                 .disabled(store.operations.isEmpty)
             }
 
             if store.operations.isEmpty {
-                ContentUnavailableView("没有历史记录", systemImage: "clock", description: Text("完成一次任务后会出现在这里"))
+                ContentUnavailableView(strings.noHistoryTitle, systemImage: "clock", description: Text(strings.noHistoryDescription))
                     .frame(maxWidth: .infinity, minHeight: 180)
             } else {
                 ForEach(store.operations) { record in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Label(record.kind.title, systemImage: record.kind.systemImage)
+                            Label(record.kind.title(in: store.settings.language), systemImage: record.kind.systemImage)
                                 .font(.headline)
                             Text(record.modeLabel)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text(record.status.title)
+                            Text(record.status.title(in: store.settings.language))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(color(record.status))
                             Button(role: .destructive) {
@@ -47,7 +53,7 @@ struct HistoryView: View {
                                 Image(systemName: "xmark.circle")
                             }
                             .buttonStyle(.borderless)
-                            .help("删除记录")
+                            .help(strings.deleteRecord)
                         }
 
                         Text(record.inputFiles.prefix(4).joined(separator: ", "))
@@ -56,13 +62,13 @@ struct HistoryView: View {
                             .lineLimit(1)
 
                         HStack {
-                            Text(AppFormatters.dateTime.string(from: record.timestamp))
+                            Text(AppFormatters.dateTime(record.timestamp, language: store.settings.language))
                             Spacer()
                             if let output = record.outputs.first {
                                 Button {
                                     store.reveal(path: output)
                                 } label: {
-                                    Label("显示 \(record.outputs.count) 个输出", systemImage: "arrow.up.right.square")
+                                    Label(strings.outputCount(record.outputs.count), systemImage: "arrow.up.right.square")
                                 }
                                 .buttonStyle(.link)
                             }

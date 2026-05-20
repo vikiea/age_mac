@@ -39,6 +39,10 @@ final class AppStore: ObservableObject {
     private var activeRecordID: UUID?
     private var userCancelled = false
 
+    var strings: AppStrings {
+        AppStrings(language: settings.language)
+    }
+
     private struct PersistedState: Codable {
         var keys: [KeyEntry]
         var operations: [OperationRecord]
@@ -128,17 +132,18 @@ final class AppStore: ObservableObject {
     }
 
     func generateKeyPair() {
+        let language = settings.language
         Task {
             do {
-                let key = try await Task.detached { [engine] in
-                    try engine.generateKeyPair()
+                let key = try await Task.detached {
+                    try AgeEngineClient().generateKeyPair(language: language)
                 }.value
                 keys.insert(key, at: 0)
                 selectedEncryptKeyID = key.id
                 selectedDecryptKeyID = key.id
                 saveState()
             } catch {
-                alertMessage = error.localizedDescription
+                alertMessage = localizedErrorDescription(error)
             }
         }
     }
@@ -147,7 +152,7 @@ final class AppStore: ObservableObject {
         let publicKey = importPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let privateKey = importPrivateKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !publicKey.isEmpty else {
-            alertMessage = "请输入公钥"
+            alertMessage = strings.requirePublicKey()
             return
         }
         let name = importKeyName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -170,16 +175,16 @@ final class AppStore: ObservableObject {
         do {
             let text = try String(contentsOf: url, encoding: .utf8)
             let imported = importKeys(from: text, fallbackName: url.deletingPathExtension().lastPathComponent)
-            alertMessage = imported == 0 ? "没有发现新的 age 密钥" : "已导入 \(imported) 个密钥"
+            alertMessage = imported == 0 ? strings.autoImportNoNewKeys : strings.importedKeys(imported)
         } catch {
-            alertMessage = "导入密钥文件失败: \(error.localizedDescription)"
+            alertMessage = strings.importKeyFileFailed(error.localizedDescription)
         }
     }
 
     func renameKey(_ key: KeyEntry, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            alertMessage = "密钥名称不能为空"
+            alertMessage = strings.requireKeyName()
             return
         }
         guard let index = keys.firstIndex(where: { $0.id == key.id }) else { return }
@@ -189,34 +194,34 @@ final class AppStore: ObservableObject {
 
     func revealPrivateKey(_ key: KeyEntry) {
         guard let privateKey = key.privateKey, !privateKey.isEmpty else {
-            alertMessage = "这个密钥没有保存私钥"
+            alertMessage = strings.missingPrivateKey()
             return
         }
 
         Task {
             do {
-                let allowed = try await LocalAuthenticationService.authenticate(reason: "查看 \(key.name) 的私钥")
+                let allowed = try await LocalAuthenticationService.authenticate(reason: strings.revealPrivateKeyHelp)
                 guard allowed else { return }
                 alertMessage = privateKey
             } catch {
-                alertMessage = "本机验证失败: \(error.localizedDescription)"
+                alertMessage = strings.authFailed(error.localizedDescription)
             }
         }
     }
 
     func exportKey(_ key: KeyEntry) {
         guard key.hasPrivateKey else {
-            alertMessage = "这个密钥没有保存私钥"
+            alertMessage = strings.missingPrivateKey()
             return
         }
 
         Task {
             do {
-                let allowed = try await LocalAuthenticationService.authenticate(reason: "导出 \(key.name) 的私钥")
+                let allowed = try await LocalAuthenticationService.authenticate(reason: strings.exportKeyHelp)
                 guard allowed else { return }
                 saveKeyFile(key)
             } catch {
-                alertMessage = "本机验证失败: \(error.localizedDescription)"
+                alertMessage = strings.authFailed(error.localizedDescription)
             }
         }
     }
@@ -235,26 +240,27 @@ final class AppStore: ObservableObject {
     func startEncrypt() {
         guard currentTask?.status != .running else { return }
         guard !encryptFiles.isEmpty else {
-            alertMessage = "请先选择要加密的文件"
+            alertMessage = strings.requireEncryptFiles()
             return
         }
 
+        let strings = strings
         let secret: String
         let recipientInfo: String
         let authArgument: String
         switch encryptAuthMode {
         case .passphrase:
             guard !encryptPassphrase.isEmpty else {
-                alertMessage = "请输入加密密码"
+                alertMessage = strings.requireEncryptPassphrase()
                 return
             }
             secret = encryptPassphrase
-            recipientInfo = "密码加密"
+            recipientInfo = strings.passphrase
             authArgument = "passphrase"
         case .key:
             let key = selectedEncryptKey?.publicKey ?? publicKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else {
-                alertMessage = "请选择或输入公钥"
+                alertMessage = strings.requirePublicKey()
                 return
             }
             secret = key
@@ -266,14 +272,12 @@ final class AppStore: ObservableObject {
         let command: EngineCommand = encryptMode == .batchPack
             ? .encryptBatch(outputName: outputName, compress: settings.compressEnabled)
             : .encryptSeparate(compress: settings.compressEnabled)
-        let modeLabel = encryptMode == .batchPack
-            ? (settings.compressEnabled ? "打包压缩" : "打包")
-            : (settings.compressEnabled ? "分别压缩加密" : "分别加密")
+        let modeLabel = strings.operationModeLabel(mode: encryptMode, compress: settings.compressEnabled)
 
         runOperation(
             kind: .encrypt,
             modeLabel: modeLabel,
-            title: "加密 \(encryptFiles.count) 个文件",
+            title: strings.encryptFilesTitle(encryptFiles.count),
             files: encryptFiles,
             request: EngineRequest(
                 command: command,
@@ -282,7 +286,8 @@ final class AppStore: ObservableObject {
                 authArgument: authArgument,
                 secret: secret,
                 duplicateStrategy: settings.duplicateStrategy,
-                concurrency: settings.concurrency
+                concurrency: settings.concurrency,
+                language: settings.language
             ),
             recipientInfo: String(recipientInfo)
         )
@@ -291,37 +296,38 @@ final class AppStore: ObservableObject {
     func startDecrypt() {
         guard currentTask?.status != .running else { return }
         guard !decryptFiles.isEmpty else {
-            alertMessage = "请先选择要解密的 .age 文件"
+            alertMessage = strings.requireDecryptFiles()
             return
         }
 
+        let strings = strings
         let secret: String
         let recipientInfo: String
         let authArgument: String
         switch decryptAuthMode {
         case .passphrase:
             guard !decryptPassphrase.isEmpty else {
-                alertMessage = "请输入解密密码"
+                alertMessage = strings.requireDecryptPassphrase()
                 return
             }
             secret = decryptPassphrase
-            recipientInfo = "密码解密"
+            recipientInfo = strings.passphrase
             authArgument = "passphrase"
         case .key:
             let key = selectedDecryptKey?.privateKey ?? privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else {
-                alertMessage = "请选择或输入私钥"
+                alertMessage = strings.requirePrivateKey()
                 return
             }
             secret = key
-            recipientInfo = "私钥解密"
+            recipientInfo = strings.privateKey
             authArgument = "privateKey"
         }
 
         runOperation(
             kind: .decrypt,
-            modeLabel: "解密",
-            title: "解密 \(decryptFiles.count) 个文件",
+            modeLabel: OperationKind.decrypt.title(in: settings.language),
+            title: strings.decryptFilesTitle(decryptFiles.count),
             files: decryptFiles,
             request: EngineRequest(
                 command: .decrypt,
@@ -330,7 +336,8 @@ final class AppStore: ObservableObject {
                 authArgument: authArgument,
                 secret: secret,
                 duplicateStrategy: settings.duplicateStrategy,
-                concurrency: settings.concurrency
+                concurrency: settings.concurrency,
+                language: settings.language
             ),
             recipientInfo: recipientInfo
         )
@@ -341,7 +348,7 @@ final class AppStore: ObservableObject {
         userCancelled = true
         activeProcess?.terminate()
         currentTask?.status = .cancelled
-        currentTask?.phase = "取消中"
+        currentTask?.phase = strings.phaseCancelling()
     }
 
     func reveal(path: String) {
@@ -434,7 +441,7 @@ final class AppStore: ObservableObject {
         )
 
         operations.insert(record, at: 0)
-        currentTask = .started(id: recordID, kind: kind, title: title, total: files.count)
+        currentTask = .started(id: recordID, kind: kind, title: title, phase: strings.phasePreparing(), total: files.count)
         activeRecordID = recordID
         userCancelled = false
         saveState()
@@ -463,7 +470,7 @@ final class AppStore: ObservableObject {
 
     private func handleEngineEvent(_ event: EngineEvent) {
         if event.event == "progress" || event.event == "done" {
-            currentTask?.phase = event.phase ?? currentTask?.phase ?? ""
+            currentTask?.phase = localizedEnginePhase(event.phase) ?? currentTask?.phase ?? ""
             currentTask?.progress = event.progress ?? currentTask?.progress ?? 0
             currentTask?.processed = event.processed ?? currentTask?.processed ?? 0
             currentTask?.total = event.total ?? currentTask?.total ?? 0
@@ -482,6 +489,22 @@ final class AppStore: ObservableObject {
         }
     }
 
+    private func localizedEnginePhase(_ phase: String?) -> String? {
+        guard let phase, !phase.isEmpty else { return nil }
+        switch phase {
+        case "Packing":
+            return settings.language == .english ? "Packing" : "打包中"
+        case "Complete":
+            return strings.phaseComplete()
+        case let value where value.hasPrefix("解密中"):
+            guard settings.language == .english else { return value }
+            let label = value.dropFirst("解密中".count).trimmingCharacters(in: .whitespaces)
+            return label.isEmpty ? "Decrypting" : "Decrypting \(label)"
+        default:
+            return phase
+        }
+    }
+
     private func finishOperation(id: UUID, result: EngineResult) {
         activeProcess = nil
         guard let index = operations.firstIndex(where: { $0.id == id }) else { return }
@@ -490,7 +513,7 @@ final class AppStore: ObservableObject {
         operations[index].outputPath = settings.outputDirectory
 
         currentTask?.status = .success
-        currentTask?.phase = "完成"
+        currentTask?.phase = strings.phaseComplete()
         currentTask?.progress = 1
         currentTask?.success = result.success
         currentTask?.fail = result.fail
@@ -502,15 +525,22 @@ final class AppStore: ObservableObject {
         activeProcess = nil
         guard let index = operations.firstIndex(where: { $0.id == id }) else { return }
         let status: OperationStatus = userCancelled ? .cancelled : .failed
-        let message = userCancelled ? "用户取消" : error.localizedDescription
+        let message = userCancelled ? strings.phaseCancelled() : localizedErrorDescription(error)
         operations[index].status = status
         operations[index].errorMessage = message
 
         currentTask?.status = status
-        currentTask?.phase = status == .cancelled ? "已取消" : "失败"
+        currentTask?.phase = status == .cancelled ? strings.phaseCancelled() : strings.phaseFailed()
         currentTask?.errorMessage = message
         userCancelled = false
         saveState()
+    }
+
+    private func localizedErrorDescription(_ error: Error) -> String {
+        if let engineError = error as? EngineClientError {
+            return engineError.errorDescription(in: settings.language)
+        }
+        return error.localizedDescription
     }
 
     private func merge(urls: [URL], into files: inout [SelectedFile]) {
@@ -538,7 +568,7 @@ final class AppStore: ObservableObject {
             let text = KeyFileCodec.exportText(for: key)
             try text.write(to: url, atomically: true, encoding: .utf8)
         } catch {
-            alertMessage = "导出密钥失败: \(error.localizedDescription)"
+            alertMessage = strings.saveKeyFailed(error.localizedDescription)
         }
     }
 
@@ -608,7 +638,7 @@ final class AppStore: ObservableObject {
             imported += importKeys(from: text, fallbackName: url.deletingPathExtension().lastPathComponent)
         }
         if imported > 0 {
-            alertMessage = "已从 ~/.config/age 导入 \(imported) 个密钥"
+            alertMessage = strings.importedAgeConfigKeys(imported)
         }
     }
 
@@ -620,7 +650,7 @@ final class AppStore: ObservableObject {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(state).write(to: stateURL, options: [.atomic])
         } catch {
-            alertMessage = "保存本地状态失败: \(error.localizedDescription)"
+            alertMessage = strings.savedStateFailed(error.localizedDescription)
         }
     }
 
