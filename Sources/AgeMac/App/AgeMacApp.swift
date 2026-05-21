@@ -30,7 +30,9 @@ struct AgeMacApp: App {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
-        WindowGroup("Age Mac") {
+        let strings = store.strings
+
+        WindowGroup("Age Mac", id: "main") {
             ContentView()
                 .environmentObject(store)
                 .environmentObject(updateService)
@@ -41,19 +43,26 @@ struct AgeMacApp: App {
         .defaultSize(width: 1180, height: 760)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("关于 Age Mac") {
+                Button(strings.aboutAgeMac) {
                     openWindow(id: "about")
                 }
             }
 
-            CommandGroup(after: .newItem) {
-                Button("添加加密文件") {
+            CommandGroup(replacing: .newItem) {
+                Button(strings.newAgeMacWindow) {
+                    openWindow(id: "main")
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                Divider()
+
+                Button(strings.addEncryptFile) {
                     store.selectedSection = .encrypt
                     store.chooseEncryptFiles()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
 
-                Button("添加解密文件") {
+                Button(strings.addDecryptFile) {
                     store.selectedSection = .decrypt
                     store.chooseDecryptFiles()
                 }
@@ -61,26 +70,26 @@ struct AgeMacApp: App {
             }
 
             CommandMenu("Age") {
-                Button("生成密钥") {
+                Button(strings.generateKey) {
                     store.selectedSection = .keys
                     store.generateKeyPair()
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
 
-                Button("选择输出目录") {
+                Button(strings.chooseOutputDirectory) {
                     store.selectedSection = .settings
                     store.chooseOutputDirectory()
                 }
 
                 Divider()
 
-                Button("检测更新") {
+                Button(strings.updateCheck()) {
                     updateService.checkForUpdates()
                 }
 
                 Divider()
 
-                Button("取消当前任务") {
+                Button(strings.cancelCurrentTask) {
                     store.cancelCurrentTask()
                 }
                 .disabled(store.currentTask?.status != .running)
@@ -88,13 +97,11 @@ struct AgeMacApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsWindowContent()
                 .environmentObject(store)
-                .padding()
-                .frame(width: 620)
         }
 
-        Window("关于 Age Mac", id: "about") {
+        Window(strings.aboutAgeMac, id: "about") {
             AboutView()
                 .environmentObject(store)
                 .environmentObject(updateService)

@@ -6,15 +6,42 @@
 
 import SwiftUI
 
-struct SettingsView: View {
+struct SettingsWindowContent: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
+        ZStack {
+            DetailBackground(
+                theme: store.settings.theme,
+                gaussianTransparencyEnabled: store.settings.gaussianTransparencyEnabled,
+                gaussianTransparencyOpacity: store.effectiveGaussianTransparencyOpacity
+            )
+
+            SettingsView()
+                .padding()
+                .frame(width: 620)
+        }
+        .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
+        .windowAppearance(store.settings.appearance)
+    }
+}
+
+struct SettingsView: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var interfaceControlsID = UUID()
+
+    var body: some View {
+        let strings = store.strings
+
         VStack(alignment: .leading, spacing: 18) {
-            PageHeader(title: "设置", subtitle: "输出目录、同名文件策略和任务参数", systemImage: "gearshape.fill")
+            PageHeader(
+                title: AppSection.settings.title(in: store.settings.language),
+                subtitle: strings.outputAndTaskSubtitle,
+                systemImage: "gearshape.fill"
+            )
 
             GlassCard {
-                Label("输出", systemImage: "folder")
+                Label(strings.output, systemImage: "folder")
                     .font(.headline)
 
                 HStack {
@@ -25,40 +52,51 @@ struct SettingsView: View {
                     Button {
                         store.chooseOutputDirectory()
                     } label: {
-                        Label("选择目录", systemImage: "folder")
+                        Label(strings.chooseDirectory, systemImage: "folder")
                     }
                 }
 
-                Picker("同名文件", selection: $store.settings.duplicateStrategy) {
+                Picker(strings.duplicateFiles, selection: $store.settings.duplicateStrategy) {
                     ForEach(DuplicateStrategy.allCases) { strategy in
-                        Text(strategy.title).tag(strategy)
+                        Text(strategy.title(in: store.settings.language)).tag(strategy)
                     }
                 }
                 .onChange(of: store.settings.duplicateStrategy) { _, _ in store.saveSettings() }
             }
 
             GlassCard {
-                Label("任务", systemImage: "cpu")
+                Label(strings.task, systemImage: "cpu")
                     .font(.headline)
 
                 Stepper(value: $store.settings.concurrency, in: 1...12) {
-                    Text("并发上限 \(store.settings.concurrency)")
+                    Text(strings.concurrencyLimit(store.settings.concurrency))
                 }
                 .onChange(of: store.settings.concurrency) { _, _ in store.saveSettings() }
 
-                Toggle("默认压缩", isOn: $store.settings.compressEnabled)
+                Toggle(strings.defaultCompress, isOn: $store.settings.compressEnabled)
                     .onChange(of: store.settings.compressEnabled) { _, _ in store.saveSettings() }
             }
 
             GlassCard {
-                Label("主题", systemImage: "paintpalette")
+                Label(strings.interface, systemImage: "globe")
                     .font(.headline)
 
-                Picker("颜色主题", selection: $store.settings.theme) {
+                InterfaceSettingsControls()
+                    .id(interfaceControlsID)
+                    .onChange(of: store.settings.appearance) { _, _ in
+                        interfaceControlsID = UUID()
+                    }
+            }
+
+            GlassCard {
+                Label(strings.theme, systemImage: "paintpalette")
+                    .font(.headline)
+
+                Picker(strings.colorTheme, selection: $store.settings.theme) {
                     ForEach(AppTheme.allCases) { theme in
                         HStack {
                             ThemeSwatch(theme: theme)
-                            Text(theme.title)
+                            Text(theme.title(in: store.settings.language))
                         }
                         .tag(theme)
                     }
@@ -82,13 +120,13 @@ struct SettingsView: View {
                                 }
                         }
                         .buttonStyle(.plain)
-                        .help(theme.title)
+                        .help(theme.title(in: store.settings.language))
                     }
                 }
 
                 Divider()
 
-                Toggle("高斯透明", isOn: $store.settings.gaussianTransparencyEnabled)
+                Toggle(strings.gaussianTransparency, isOn: $store.settings.gaussianTransparencyEnabled)
                     .onChange(of: store.settings.gaussianTransparencyEnabled) { _, _ in store.saveSettings() }
 
                 if store.settings.gaussianTransparencyEnabled {
@@ -96,6 +134,29 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+private struct InterfaceSettingsControls: View {
+    @EnvironmentObject private var store: AppStore
+
+    var body: some View {
+        Picker(store.strings.appearance, selection: $store.settings.appearance) {
+            ForEach(AppAppearance.allCases) { appearance in
+                Text(appearance.title(in: store.settings.language)).tag(appearance)
+            }
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: store.settings.appearance) { _, _ in store.saveSettings() }
+
+        Picker(store.strings.settingsLanguageSubtitle, selection: $store.settings.language) {
+            ForEach(AppLanguage.allCases) { language in
+                Text(language.title).tag(language)
+            }
+        }
+        .pickerStyle(.menu)
+        .id("language-\(store.settings.appearance.rawValue)-\(store.settings.language.rawValue)")
+        .onChange(of: store.settings.language) { _, _ in store.saveSettings() }
     }
 }
 
@@ -108,7 +169,7 @@ private struct GaussianTransparencyControl: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("透明度")
+                Text(store.strings.gaussianOpacity)
                 Spacer()
                 Text("\(displayedOpacity)%")
                     .foregroundStyle(.secondary)
@@ -181,6 +242,5 @@ private struct ThemeSwatch: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .stroke(.white.opacity(0.35), lineWidth: 1)
             }
-            .accessibilityLabel(theme.title)
     }
 }

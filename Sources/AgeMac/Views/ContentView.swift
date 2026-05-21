@@ -20,6 +20,7 @@ struct ContentView: View {
 
             NavigationSplitView {
                 SidebarView(selection: $store.selectedSection)
+                    .navigationSplitViewColumnWidth(min: 330, ideal: 360, max: 430)
             } detail: {
                 DetailScrollContainer {
                     switch store.selectedSection ?? .encrypt {
@@ -41,11 +42,12 @@ struct ContentView: View {
             .background(Color.clear)
         }
         .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
+        .windowAppearance(store.settings.appearance)
         .alert("Age Mac", isPresented: Binding(
             get: { store.alertMessage != nil },
             set: { if !$0 { store.alertMessage = nil } }
         )) {
-            Button("好") { store.alertMessage = nil }
+            Button(store.strings.ok) { store.alertMessage = nil }
         } message: {
             Text(store.alertMessage ?? "")
         }
@@ -299,10 +301,10 @@ struct SidebarView: View {
                         .foregroundStyle(iconColor(for: section))
                         .frame(width: 18)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(section.title)
+                        Text(section.title(in: store.settings.language))
                             .foregroundStyle(titleColor(for: section))
                             .fontWeight(selection == section ? .semibold : .regular)
-                        Text(section.subtitle)
+                        Text(section.subtitle(in: store.settings.language))
                             .font(.caption)
                             .foregroundStyle(subtitleColor(for: section))
                             .lineLimit(1)

@@ -85,12 +85,13 @@ struct PageHeader: View {
 }
 
 struct FileListView: View {
+    @EnvironmentObject private var store: AppStore
     var files: [SelectedFile]
     var onRemove: (SelectedFile) -> Void
 
     var body: some View {
         if files.isEmpty {
-            ContentUnavailableView("没有文件", systemImage: "doc.badge.plus", description: Text("使用上方按钮添加文件"))
+            ContentUnavailableView(store.strings.noFilesTitle, systemImage: "doc.badge.plus", description: Text(store.strings.noFilesDescription))
                 .frame(maxWidth: .infinity, minHeight: 180)
         } else {
             List(files) { file in
@@ -101,7 +102,7 @@ struct FileListView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(file.name)
                             .lineLimit(1)
-                        Text("\(AppFormatters.fileSize(file.size)) · \(AppFormatters.shortPath(file.path))")
+                        Text("\(AppFormatters.fileSize(file.size, language: store.settings.language)) · \(AppFormatters.shortPath(file.path))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -113,7 +114,7 @@ struct FileListView: View {
                         Image(systemName: "xmark")
                     }
                     .buttonStyle(.borderless)
-                    .help("移除")
+                    .help(store.strings.remove())
                 }
                 .padding(.vertical, 3)
             }
@@ -134,7 +135,7 @@ struct TaskStatusCard: View {
                     Label(task.title, systemImage: task.kind.systemImage)
                         .font(.headline)
                     Spacer()
-                    Text(task.status.title)
+                    Text(task.status.title(in: store.settings.language))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(statusColor(task.status))
                     if task.status != .running {
@@ -144,7 +145,7 @@ struct TaskStatusCard: View {
                             Image(systemName: "xmark.circle")
                         }
                         .buttonStyle(.borderless)
-                        .help("删除结果")
+                        .help(store.strings.deleteResult)
                     }
                 }
 
@@ -176,27 +177,14 @@ struct TaskStatusCard: View {
                 }
 
                 if !task.outputs.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 6) {
-                            ForEach(task.outputs, id: \.self) { output in
-                                Button {
-                                    store.reveal(path: output)
-                                } label: {
-                                    Label(AppFormatters.shortPath(output), systemImage: "arrow.up.right.square")
-                                        .lineLimit(1)
-                                }
-                                .buttonStyle(.link)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 140)
+                    OutputFilesList(outputs: task.outputs)
                 }
 
                 if task.status == .running {
                     Button(role: .destructive) {
                         store.cancelCurrentTask()
                     } label: {
-                        Label("取消任务", systemImage: "stop.circle")
+                        Label(store.strings.cancelTask, systemImage: "stop.circle")
                     }
                 }
             }
@@ -210,6 +198,118 @@ struct TaskStatusCard: View {
         case .failed: .red
         case .cancelled: .orange
         }
+    }
+}
+
+private struct OutputFilesList: View {
+    @EnvironmentObject private var store: AppStore
+    var outputs: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(store.strings.outputFiles, systemImage: "tray.full")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(outputs.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ScrollView {
+                LazyVStack(spacing: 6) {
+                    ForEach(outputs, id: \.self) { output in
+                        OutputFileRow(path: output)
+                    }
+                }
+                .padding(2)
+            }
+            .frame(maxHeight: 190)
+        }
+    }
+}
+
+private struct OutputFileRow: View {
+    @EnvironmentObject private var store: AppStore
+    @State private var isHovering = false
+    var path: String
+
+    var body: some View {
+        Button {
+            store.reveal(path: path)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: fileIcon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(store.settings.theme.accentColor)
+                    .frame(width: 28, height: 28)
+                    .background(iconBackground, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fileName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(parentPath)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isHovering ? store.settings.theme.accentColor : .secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(borderColor, lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(store.strings.openInFinder)
+        .onHover { isHovering = $0 }
+    }
+
+    private var url: URL {
+        URL(fileURLWithPath: path)
+    }
+
+    private var fileName: String {
+        url.lastPathComponent.isEmpty ? path : url.lastPathComponent
+    }
+
+    private var parentPath: String {
+        AppFormatters.shortPath(url.deletingLastPathComponent().path)
+    }
+
+    private var fileIcon: String {
+        path.hasSuffix("/") ? "folder" : "doc"
+    }
+
+    private var iconBackground: Color {
+        store.settings.theme.accentColor.opacity(isHovering ? 0.18 : 0.11)
+    }
+
+    private var rowBackground: Color {
+        if isHovering {
+            store.settings.theme.accentColor.opacity(0.12)
+        } else {
+            Color.primary.opacity(0.035)
+        }
+    }
+
+    private var borderColor: Color {
+        isHovering ? store.settings.theme.accentColor.opacity(0.28) : Color.primary.opacity(0.08)
     }
 }
 
@@ -324,7 +424,49 @@ extension AppTheme {
     }
 }
 
+extension View {
+    func windowAppearance(_ appearance: AppAppearance) -> some View {
+        background(WindowAppearanceConfigurator(appearance: appearance))
+    }
+}
+
+private struct WindowAppearanceConfigurator: NSViewRepresentable {
+    var appearance: AppAppearance
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        updateWindow(from: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        updateWindow(from: nsView)
+    }
+
+    private func updateWindow(from view: NSView) {
+        let nsAppearance = appearance.nsAppearance
+        apply(nsAppearance, to: view.window)
+        DispatchQueue.main.async { [weak view] in
+            apply(nsAppearance, to: view?.window)
+        }
+    }
+
+    private func apply(_ nsAppearance: NSAppearance?, to window: NSWindow?) {
+        guard let window else { return }
+        window.appearance = nsAppearance
+        window.contentView?.appearance = nsAppearance
+        window.contentView?.needsDisplay = true
+        window.invalidateShadow()
+        for child in window.childWindows ?? [] {
+            child.appearance = nsAppearance
+            child.contentView?.appearance = nsAppearance
+            child.contentView?.needsDisplay = true
+        }
+    }
+}
+
 struct KeyPicker: View {
+    @EnvironmentObject private var store: AppStore
     var title: String
     var keys: [KeyEntry]
     @Binding var selection: UUID?
@@ -336,7 +478,7 @@ struct KeyPicker: View {
 
     var body: some View {
         Picker(title, selection: $selection) {
-            Text("不使用已保存密钥").tag(UUID?.none)
+            Text(store.strings.noKeySelection).tag(UUID?.none)
             ForEach(eligibleKeys) { key in
                 Text(key.name).tag(Optional(key.id))
             }
