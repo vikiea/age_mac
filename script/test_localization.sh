@@ -11,6 +11,7 @@ swiftc \
   "$repo_root/Sources/AgeMac/Models/AppModels.swift" \
   "$repo_root/Sources/AgeMac/Support/AppStrings.swift" \
   "$repo_root/Sources/AgeMac/Services/AgeEngineClient.swift" \
+  "$repo_root/Sources/AgeMac/Stores/AppPersistence.swift" \
   "$repo_root/Tests/LocalizationChecks/main.swift" \
   -o "$runner"
 

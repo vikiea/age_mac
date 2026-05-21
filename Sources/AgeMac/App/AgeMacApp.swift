@@ -32,7 +32,7 @@ struct AgeMacApp: App {
     var body: some Scene {
         let strings = store.strings
 
-        WindowGroup("Age Mac") {
+        WindowGroup("Age Mac", id: "main") {
             ContentView()
                 .environmentObject(store)
                 .environmentObject(updateService)
@@ -48,7 +48,14 @@ struct AgeMacApp: App {
                 }
             }
 
-            CommandGroup(after: .newItem) {
+            CommandGroup(replacing: .newItem) {
+                Button(strings.newAgeMacWindow) {
+                    openWindow(id: "main")
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                Divider()
+
                 Button(strings.addEncryptFile) {
                     store.selectedSection = .encrypt
                     store.chooseEncryptFiles()
@@ -90,10 +97,8 @@ struct AgeMacApp: App {
         }
 
         Settings {
-            SettingsView()
+            SettingsWindowContent()
                 .environmentObject(store)
-                .padding()
-                .frame(width: 620)
         }
 
         Window(strings.aboutAgeMac, id: "about") {

@@ -20,6 +20,7 @@ struct ContentView: View {
 
             NavigationSplitView {
                 SidebarView(selection: $store.selectedSection)
+                    .navigationSplitViewColumnWidth(min: 330, ideal: 360, max: 430)
             } detail: {
                 DetailScrollContainer {
                     switch store.selectedSection ?? .encrypt {
@@ -41,14 +42,15 @@ struct ContentView: View {
             .background(Color.clear)
         }
         .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
-            .alert("Age Mac", isPresented: Binding(
-                get: { store.alertMessage != nil },
-                set: { if !$0 { store.alertMessage = nil } }
-            )) {
-                Button(store.strings.ok) { store.alertMessage = nil }
-            } message: {
-                Text(store.alertMessage ?? "")
-            }
+        .windowAppearance(store.settings.appearance)
+        .alert("Age Mac", isPresented: Binding(
+            get: { store.alertMessage != nil },
+            set: { if !$0 { store.alertMessage = nil } }
+        )) {
+            Button(store.strings.ok) { store.alertMessage = nil }
+        } message: {
+            Text(store.alertMessage ?? "")
+        }
     }
 }
 

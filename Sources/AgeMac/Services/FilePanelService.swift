@@ -57,7 +57,18 @@ enum FilePanelService {
     }
 
     static func reveal(path: String) {
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        let url = URL(fileURLWithPath: path)
+        if FileManager.default.fileExists(atPath: path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+            return
+        }
+
+        let folder = url.deletingLastPathComponent()
+        if FileManager.default.fileExists(atPath: folder.path) {
+            NSWorkspace.shared.open(folder)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
     }
 
     static func saveFile(defaultName: String, allowedExtensions: [String]? = nil) -> URL? {

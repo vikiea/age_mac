@@ -6,6 +6,7 @@
 
 import Combine
 import Foundation
+import AppKit
 
 @MainActor
 final class AppStore: ObservableObject {
@@ -35,6 +36,8 @@ final class AppStore: ObservableObject {
     @Published var importPrivateKey: String = ""
 
     private let engine = AgeEngineClient()
+    private let persistence: AppPersistence
+    private let keychain = KeychainSecretStore()
     private var activeProcess: Process?
     private var activeRecordID: UUID?
     private var userCancelled = false
@@ -43,13 +46,8 @@ final class AppStore: ObservableObject {
         AppStrings(language: settings.language)
     }
 
-    private struct PersistedState: Codable {
-        var keys: [KeyEntry]
-        var operations: [OperationRecord]
-        var settings: AppSettings
-    }
-
-    init() {
+    init(persistence: AppPersistence = AppPersistence()) {
+        self.persistence = persistence
         loadState()
         importAgeConfigKeysIfNeeded()
     }
@@ -104,7 +102,7 @@ final class AppStore: ObservableObject {
     func chooseOutputDirectory() {
         guard let folder = FilePanelService.chooseFolder() else { return }
         settings.outputDirectory = folder.path
-        saveState()
+        saveSettings()
     }
 
     func addEncryptFiles(_ urls: [URL]) {
@@ -138,10 +136,11 @@ final class AppStore: ObservableObject {
                 let key = try await Task.detached {
                     try AgeEngineClient().generateKeyPair(language: language)
                 }.value
-                keys.insert(key, at: 0)
-                selectedEncryptKeyID = key.id
-                selectedDecryptKeyID = key.id
-                saveState()
+                let storedKey = storePrivateKeyIfNeeded(for: key)
+                keys.insert(storedKey, at: 0)
+                selectedEncryptKeyID = storedKey.id
+                selectedDecryptKeyID = storedKey.id
+                saveKeys()
             } catch {
                 alertMessage = localizedErrorDescription(error)
             }
@@ -156,18 +155,21 @@ final class AppStore: ObservableObject {
             return
         }
         let name = importKeyName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let key = KeyEntry(
+        var key = KeyEntry(
             id: UUID(),
             name: name.isEmpty ? "Imported key" : name,
             publicKey: publicKey,
             privateKey: privateKey.isEmpty ? nil : privateKey,
             createdAt: Date()
         )
+        if !privateKey.isEmpty {
+            key = storePrivateKeyIfNeeded(for: key)
+        }
         keys.insert(key, at: 0)
         importKeyName = ""
         importPublicKey = ""
         importPrivateKey = ""
-        saveState()
+        saveKeys()
     }
 
     func importKeyFromFile() {
@@ -189,11 +191,11 @@ final class AppStore: ObservableObject {
         }
         guard let index = keys.firstIndex(where: { $0.id == key.id }) else { return }
         keys[index].name = trimmed
-        saveState()
+        saveKeys()
     }
 
     func revealPrivateKey(_ key: KeyEntry) {
-        guard let privateKey = key.privateKey, !privateKey.isEmpty else {
+        guard key.hasPrivateKey else {
             alertMessage = strings.missingPrivateKey()
             return
         }
@@ -202,6 +204,10 @@ final class AppStore: ObservableObject {
             do {
                 let allowed = try await LocalAuthenticationService.authenticate(reason: strings.revealPrivateKeyHelp)
                 guard allowed else { return }
+                guard let privateKey = privateKey(for: key), !privateKey.isEmpty else {
+                    alertMessage = strings.missingPrivateKey()
+                    return
+                }
                 alertMessage = privateKey
             } catch {
                 alertMessage = strings.authFailed(error.localizedDescription)
@@ -219,7 +225,11 @@ final class AppStore: ObservableObject {
             do {
                 let allowed = try await LocalAuthenticationService.authenticate(reason: strings.exportKeyHelp)
                 guard allowed else { return }
-                saveKeyFile(key)
+                guard let privateKey = privateKey(for: key), !privateKey.isEmpty else {
+                    alertMessage = strings.missingPrivateKey()
+                    return
+                }
+                saveKeyFile(key.withPrivateKey(privateKey))
             } catch {
                 alertMessage = strings.authFailed(error.localizedDescription)
             }
@@ -227,6 +237,7 @@ final class AppStore: ObservableObject {
     }
 
     func deleteKey(_ key: KeyEntry) {
+        keychain.deletePrivateKey(for: key.id)
         keys.removeAll { $0.id == key.id }
         if selectedEncryptKeyID == key.id {
             selectedEncryptKeyID = nil
@@ -234,7 +245,7 @@ final class AppStore: ObservableObject {
         if selectedDecryptKeyID == key.id {
             selectedDecryptKeyID = nil
         }
-        saveState()
+        saveKeys()
     }
 
     func startEncrypt() {
@@ -314,7 +325,7 @@ final class AppStore: ObservableObject {
             recipientInfo = strings.passphrase
             authArgument = "passphrase"
         case .key:
-            let key = selectedDecryptKey?.privateKey ?? privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = selectedDecryptKey.flatMap(privateKey(for:)) ?? privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else {
                 alertMessage = strings.requirePrivateKey()
                 return
@@ -357,7 +368,7 @@ final class AppStore: ObservableObject {
 
     func clearHistory() {
         operations.removeAll()
-        saveState()
+        saveHistory()
     }
 
     func removeCurrentTask(kind: OperationKind) {
@@ -373,7 +384,7 @@ final class AppStore: ObservableObject {
         if currentTask?.id == id {
             currentTask = nil
         }
-        saveState()
+        saveHistory()
     }
 
     func saveSettings() {
@@ -390,7 +401,8 @@ final class AppStore: ObservableObject {
             renderedGaussianTransparencyOpacity = settings.gaussianTransparencyOpacity
         }
 
-        saveState()
+        NSApp.appearance = settings.appearance.nsAppearance
+        persistSettings()
     }
 
     func previewGaussianTransparencyOpacity(_ opacity: Int) {
@@ -444,7 +456,7 @@ final class AppStore: ObservableObject {
         currentTask = .started(id: recordID, kind: kind, title: title, phase: strings.phasePreparing(), total: files.count)
         activeRecordID = recordID
         userCancelled = false
-        saveState()
+        saveHistory()
 
         Task {
             do {
@@ -518,7 +530,7 @@ final class AppStore: ObservableObject {
         currentTask?.success = result.success
         currentTask?.fail = result.fail
         currentTask?.outputs = result.outputs
-        saveState()
+        saveHistory()
     }
 
     private func failOperation(id: UUID, error: Error) {
@@ -533,7 +545,7 @@ final class AppStore: ObservableObject {
         currentTask?.phase = status == .cancelled ? strings.phaseCancelled() : strings.phaseFailed()
         currentTask?.errorMessage = message
         userCancelled = false
-        saveState()
+        saveHistory()
     }
 
     private func localizedErrorDescription(_ error: Error) -> String {
@@ -580,11 +592,9 @@ final class AppStore: ObservableObject {
     }
 
     private func loadState() {
-        guard let data = try? Data(contentsOf: stateURL),
-              let state = try? JSONDecoder().decode(PersistedState.self, from: data) else {
-            return
-        }
+        let state = persistence.load()
         keys = state.keys
+        migrateInlinePrivateKeysToKeychain()
         operations = state.operations
         settings = state.settings
         renderedGaussianTransparencyOpacity = settings.gaussianTransparencyOpacity
@@ -596,13 +606,14 @@ final class AppStore: ObservableObject {
     private func importKeys(from text: String, fallbackName: String) -> Int {
         let parsed = KeyFileCodec.parseMany(text, fallbackName: fallbackName)
         var existingPublicKeys = Set(keys.map(\.publicKey).filter { !$0.isEmpty })
-        var existingPrivateKeys = Set(keys.compactMap(\.privateKey).filter { !$0.isEmpty })
+        var existingPrivateKeys = Set(keys.compactMap { privateKey(for: $0) }.filter { !$0.isEmpty })
         var additions: [KeyEntry] = []
         for key in parsed {
             let publicExists = !key.publicKey.isEmpty && existingPublicKeys.contains(key.publicKey)
             let privateExists = key.privateKey.map { existingPrivateKeys.contains($0) } ?? false
             guard !publicExists && !privateExists else { continue }
-            additions.append(key)
+            let storedKey = storePrivateKeyIfNeeded(for: key)
+            additions.append(storedKey)
             existingPublicKeys.insert(key.publicKey)
             if let privateKey = key.privateKey, !privateKey.isEmpty {
                 existingPrivateKeys.insert(privateKey)
@@ -612,7 +623,7 @@ final class AppStore: ObservableObject {
         keys.insert(contentsOf: additions, at: 0)
         selectedEncryptKeyID = keys.first(where: { !$0.publicKey.isEmpty })?.id
         selectedDecryptKeyID = keys.first(where: { $0.hasPrivateKey })?.id
-        saveState()
+        saveKeys()
         return additions.count
     }
 
@@ -642,24 +653,63 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func saveState() {
+    private func saveKeys() {
         do {
-            try FileManager.default.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
-            let state = PersistedState(keys: keys, operations: Array(operations.prefix(200)), settings: settings)
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try encoder.encode(state).write(to: stateURL, options: [.atomic])
+            try persistence.saveKeys(keys)
         } catch {
             alertMessage = strings.savedStateFailed(error.localizedDescription)
         }
     }
 
-    private var appSupportURL: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("AgeMac", isDirectory: true)
+    private func privateKey(for key: KeyEntry) -> String? {
+        if let inlinePrivateKey = key.privateKey, !inlinePrivateKey.isEmpty {
+            return inlinePrivateKey
+        }
+        return try? keychain.readPrivateKey(for: key.id)
     }
 
-    private var stateURL: URL {
-        appSupportURL.appendingPathComponent("state.json")
+    private func storePrivateKeyIfNeeded(for key: KeyEntry) -> KeyEntry {
+        guard let privateKey = key.privateKey, !privateKey.isEmpty else { return key }
+        do {
+            try keychain.savePrivateKey(privateKey, for: key.id)
+            return key.withPrivateKey(nil, privateKeyStored: true)
+        } catch {
+            alertMessage = strings.savedStateFailed(error.localizedDescription)
+            return key
+        }
+    }
+
+    private func migrateInlinePrivateKeysToKeychain() {
+        var changed = false
+        for index in keys.indices {
+            guard let privateKey = keys[index].privateKey, !privateKey.isEmpty else { continue }
+            do {
+                try keychain.savePrivateKey(privateKey, for: keys[index].id)
+                keys[index] = keys[index].withPrivateKey(nil, privateKeyStored: true)
+                changed = true
+            } catch {
+                alertMessage = strings.savedStateFailed(error.localizedDescription)
+            }
+        }
+        if changed {
+            saveKeys()
+        }
+    }
+
+    private func persistSettings() {
+        do {
+            try persistence.saveSettings(settings)
+        } catch {
+            alertMessage = strings.savedStateFailed(error.localizedDescription)
+        }
+    }
+
+    private func saveHistory() {
+        do {
+            operations = Array(operations.prefix(AppPersistence.historyLimit))
+            try persistence.saveHistory(operations)
+        } catch {
+            alertMessage = strings.savedStateFailed(error.localizedDescription)
+        }
     }
 }

@@ -15,6 +15,7 @@ struct AppStrings {
     var addEncryptFile: String { text(en: "Add Encrypt Files", zh: "添加加密文件") }
     var addFiles: String { text(en: "Add Files", zh: "添加文件") }
     var addFolder: String { text(en: "Add Folder", zh: "添加文件夹") }
+    var appearance: String { text(en: "Appearance", zh: "外观") }
     var archiveNamePlaceholder: String { text(en: "Output file name", zh: "输出文件名") }
     var autoImportNoNewKeys: String { text(en: "No new age keys found", zh: "没有发现新的 age 密钥") }
     var cancelCurrentTask: String { text(en: "Cancel Current Task", zh: "取消当前任务") }
@@ -43,6 +44,7 @@ struct AppStrings {
     var importFromFile: String { text(en: "Import from File", zh: "从文件导入") }
     var importKey: String { text(en: "Import", zh: "导入") }
     var inputFiles: String { text(en: "Input Files", zh: "输入文件") }
+    var interface: String { text(en: "Interface", zh: "界面") }
     var keyName: String { text(en: "Key name", zh: "密钥名称") }
     var keysTitle: String { text(en: "Saved Keys", zh: "已保存密钥") }
     var keysSubtitle: String { text(en: "Generate, import, and manage local X25519 age keys", zh: "生成、导入并管理本地 X25519 age 密钥") }
@@ -55,10 +57,13 @@ struct AppStrings {
     var noKeySelection: String { text(en: "Do not use a saved key", zh: "不使用已保存密钥") }
     var noKeysDescription: String { text(en: "Generate or import an age key", zh: "生成或导入一个 age 密钥") }
     var noKeysTitle: String { text(en: "No Keys", zh: "没有密钥") }
+    var newAgeMacWindow: String { text(en: "New Age Mac Window", zh: "新建 Age Mac 窗口") }
     var ok: String { text(en: "OK", zh: "好") }
     var openSourceComponents: String { text(en: "Open Source Components", zh: "开源组件") }
+    var openInFinder: String { text(en: "Open in Finder", zh: "在 Finder 中打开") }
     var output: String { text(en: "Output", zh: "输出") }
-    var outputAndTaskSubtitle: String { text(en: "Output folder, matching-file policy, language, and task options", zh: "输出目录、同名文件策略、语言和任务参数") }
+    var outputAndTaskSubtitle: String { text(en: "Output folder, matching-file policy, appearance, language, and task options", zh: "输出目录、同名文件策略、外观、语言和任务参数") }
+    var outputFiles: String { text(en: "Output Files", zh: "输出文件") }
     var passphrase: String { text(en: "Passphrase", zh: "密码") }
     var privateKey: String { text(en: "Private key", zh: "私钥") }
     var privateKeyOptional: String { text(en: "Private key (optional)", zh: "私钥（可选）") }

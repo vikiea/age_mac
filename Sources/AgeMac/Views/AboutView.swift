@@ -60,6 +60,7 @@ struct AboutView: View {
         }
         .frame(width: 580, height: 620)
         .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
+        .windowAppearance(store.settings.appearance)
     }
 
     private var header: some View {

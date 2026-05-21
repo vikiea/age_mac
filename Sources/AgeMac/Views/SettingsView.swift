@@ -6,8 +6,29 @@
 
 import SwiftUI
 
+struct SettingsWindowContent: View {
+    @EnvironmentObject private var store: AppStore
+
+    var body: some View {
+        ZStack {
+            DetailBackground(
+                theme: store.settings.theme,
+                gaussianTransparencyEnabled: store.settings.gaussianTransparencyEnabled,
+                gaussianTransparencyOpacity: store.effectiveGaussianTransparencyOpacity
+            )
+
+            SettingsView()
+                .padding()
+                .frame(width: 620)
+        }
+        .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
+        .windowAppearance(store.settings.appearance)
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var store: AppStore
+    @State private var interfaceControlsID = UUID()
 
     var body: some View {
         let strings = store.strings
@@ -57,16 +78,14 @@ struct SettingsView: View {
             }
 
             GlassCard {
-                Label(strings.languageLabel, systemImage: "globe")
+                Label(strings.interface, systemImage: "globe")
                     .font(.headline)
 
-                Picker(strings.settingsLanguageSubtitle, selection: $store.settings.language) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.title).tag(language)
+                InterfaceSettingsControls()
+                    .id(interfaceControlsID)
+                    .onChange(of: store.settings.appearance) { _, _ in
+                        interfaceControlsID = UUID()
                     }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: store.settings.language) { _, _ in store.saveSettings() }
             }
 
             GlassCard {
@@ -115,6 +134,29 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+}
+
+private struct InterfaceSettingsControls: View {
+    @EnvironmentObject private var store: AppStore
+
+    var body: some View {
+        Picker(store.strings.appearance, selection: $store.settings.appearance) {
+            ForEach(AppAppearance.allCases) { appearance in
+                Text(appearance.title(in: store.settings.language)).tag(appearance)
+            }
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: store.settings.appearance) { _, _ in store.saveSettings() }
+
+        Picker(store.strings.settingsLanguageSubtitle, selection: $store.settings.language) {
+            ForEach(AppLanguage.allCases) { language in
+                Text(language.title).tag(language)
+            }
+        }
+        .pickerStyle(.menu)
+        .id("language-\(store.settings.appearance.rawValue)-\(store.settings.language.rawValue)")
+        .onChange(of: store.settings.language) { _, _ in store.saveSettings() }
     }
 }
 
