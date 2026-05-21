@@ -4,69 +4,406 @@ This code is released under the MIT License.
 See LICENSE for details.
 -->
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Age Mac Privacy Policy</title>
+  <meta name="description" content="Age Mac is local-first and does not upload files, keys, passphrases, telemetry, analytics, or operation history.">
+  <meta name="theme-color" content="#ffffff">
   <style>
     :root {
-      color-scheme: light dark;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.6;
+      color-scheme: light;
+      --ink: #000000;
+      --canvas: #ffffff;
+      --surface-soft: #f7f7f5;
+      --hairline: #e6e6e6;
+      --block-lime: #dceeb1;
+      --block-lilac: #c5b0f4;
+      --block-navy: #1f1d3d;
+      --inverse-ink: #ffffff;
+      --content: 920px;
+      --gutter: 42px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.45;
+      letter-spacing: 0;
+      background: var(--canvas);
+      color: var(--ink);
     }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
-      padding: 44px 22px;
-      background: Canvas;
-      color: CanvasText;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--ink);
+      font-size: 18px;
     }
-    main {
-      max-width: 820px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 36px;
-      margin: 0 0 8px;
-      letter-spacing: 0;
-    }
-    h2 {
-      margin-top: 30px;
-    }
-    p, li {
-      color: color-mix(in srgb, CanvasText 76%, transparent);
-    }
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.95em;
-    }
+
     a {
-      color: LinkText;
+      color: inherit;
       text-decoration: none;
     }
-    a:hover {
-      text-decoration: underline;
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    .site-header {
+      border-bottom: 1px solid var(--hairline);
+      background: var(--canvas);
+    }
+
+    .header-inner {
+      width: min(var(--content), calc(100% - var(--gutter) * 2));
+      min-height: 72px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand,
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .brand img {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--hairline);
+      border-radius: 8px;
+    }
+
+    .language-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: var(--canvas);
+    }
+
+    .language-button,
+    .button {
+      min-height: 44px;
+      border-radius: 999px;
+      font: inherit;
+      font-weight: 540;
+      cursor: pointer;
+    }
+
+    .language-button {
+      border: 0;
+      padding: 7px 12px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .language-button[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--inverse-ink);
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 18px;
+      border: 1px solid var(--ink);
+      background: var(--canvas);
+      color: var(--ink);
+    }
+
+    .button.primary {
+      background: var(--ink);
+      color: var(--inverse-ink);
+    }
+
+    main {
+      width: min(var(--content), calc(100% - var(--gutter) * 2));
+      margin: 0 auto;
+      padding: 76px 0 92px;
+    }
+
+    .eyebrow,
+    .caption {
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .eyebrow {
+      margin-bottom: 18px;
+      font-size: 14px;
+    }
+
+    h1 {
+      max-width: 760px;
+      font-size: 72px;
+      line-height: 1;
+      font-weight: 340;
+    }
+
+    .lede {
+      max-width: 740px;
+      margin-top: 26px;
+      font-size: 22px;
+      font-weight: 330;
+      line-height: 1.4;
+    }
+
+    .policy-grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 54px;
+    }
+
+    .policy-card {
+      padding: 34px;
+      border-radius: 24px;
+      background: var(--block-lime);
+    }
+
+    .policy-card:nth-child(2) {
+      background: var(--block-lilac);
+    }
+
+    .policy-card:nth-child(3) {
+      background: var(--surface-soft);
+      border: 1px solid var(--hairline);
+    }
+
+    .policy-card h2 {
+      margin-bottom: 14px;
+      font-size: 28px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .policy-card p {
+      font-size: 18px;
+      line-height: 1.48;
+      font-weight: 330;
+    }
+
+    code {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 3px 0;
+      font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+      font-size: 0.9em;
+      overflow-wrap: anywhere;
+    }
+
+    .footer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 44px;
+    }
+
+    @media (max-width: 760px) {
+      :root {
+        --gutter: 22px;
+      }
+
+      .header-inner {
+        display: grid;
+        padding: 14px 0;
+      }
+
+      .nav-actions {
+        flex-wrap: wrap;
+      }
+
+      main {
+        padding: 48px 0 64px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .lede {
+        font-size: 19px;
+      }
+
+      .policy-card {
+        margin-left: calc(var(--gutter) * -1);
+        margin-right: calc(var(--gutter) * -1);
+        padding: 32px 22px;
+        border-radius: 0;
+      }
+
+      .button {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="../" aria-label="Age Mac">
+        <img src="../assets/app-icon.png" width="68" height="68" alt="">
+        <span>Age Mac</span>
+      </a>
+      <div class="nav-actions">
+        <a class="button" href="../" data-i18n="nav.home">Home</a>
+        <div class="language-switch" role="group" aria-label="Language">
+          <button class="language-button" type="button" data-lang-button="en" aria-pressed="true">EN</button>
+          <button class="language-button" type="button" data-lang-button="zh" aria-pressed="false">中文</button>
+        </div>
+        <a class="button primary" href="https://github.com/vikiea/age_mac/releases/download/v1.2/AgeMac-1.2-universal.dmg" data-i18n="nav.download">Download 1.2</a>
+      </div>
+    </div>
+  </header>
+
   <main>
-    <h1>Age Mac Privacy Policy</h1>
-    <p>Effective date: May 18, 2026</p>
+    <p class="eyebrow" data-i18n="hero.eyebrow">Privacy policy</p>
+    <h1 data-i18n="hero.title">Your encryption workflow stays local.</h1>
+    <p class="lede" data-i18n="hero.lede">Age Mac does not upload files, keys, passphrases, telemetry, analytics, or operation history.</p>
 
-    <h2>Local Data</h2>
-    <p>Age Mac 是本地优先的 macOS 加解密应用。它不会上传你的文件、密钥、密码、遥测数据、分析数据或操作历史。</p>
-    <p>应用会在本机处理你选择的文件、输出设置、操作历史和 age 密钥。查看或导出保存的私钥需要本机 macOS 验证。</p>
+    <section class="policy-grid" aria-label="Policy sections">
+      <article class="policy-card">
+        <p class="caption" data-i18n="local.caption">Local data</p>
+        <h2 data-i18n="local.title">Files and secrets stay on your Mac.</h2>
+        <p data-i18n="local.body">The app processes selected files, local settings, operation history, and age keys on this device. Saved private keys remain local in the macOS Keychain, and viewing or exporting them requires local macOS authentication.</p>
+      </article>
 
-    <h2>Network Access</h2>
-    <p>Age Mac 使用 Sparkle 检测更新。更新检查会读取公开的更新元数据：</p>
-    <p><code>https://vikiea.github.io/age_mac/appcast-arm64.xml</code><br>
-    <code>https://vikiea.github.io/age_mac/appcast-x86_64.xml</code></p>
-    <p>GitHub Pages 和网络基础设施可能接收到普通 Web 请求元数据，例如 IP 地址、User-Agent 和请求时间。Age Mac 不会把文件、密钥、密码或历史记录加入这些请求。</p>
+      <article class="policy-card">
+        <p class="caption" data-i18n="network.caption">Network access</p>
+        <h2 data-i18n="network.title">Update checks read public metadata.</h2>
+        <p>
+          <span data-i18n="network.body">Age Mac uses Sparkle for update checks. Sparkle fetches public update metadata from:</span><br>
+          <code>https://vikiea.github.io/age_mac/appcast-arm64.xml</code><br>
+          <code>https://vikiea.github.io/age_mac/appcast-x86_64.xml</code>
+        </p>
+      </article>
 
-    <h2>Contact</h2>
-    <p>Author: vikiea &lt;vikiea@users.noreply.github.com&gt;</p>
-    <p><a href="https://github.com/vikiea/age_mac">GitHub repository</a></p>
+      <article class="policy-card">
+        <p class="caption" data-i18n="web.caption">Web request metadata</p>
+        <h2 data-i18n="web.title">The update request does not include your secrets.</h2>
+        <p data-i18n="web.body">GitHub Pages and network infrastructure may receive ordinary web request metadata such as IP address, User-Agent, and request time. Age Mac does not add files, keys, passphrases, or history to these requests.</p>
+      </article>
+    </section>
+
+    <div class="footer-actions">
+      <a class="button primary" href="https://github.com/vikiea/age_mac" data-i18n="footer.github">Open GitHub repository</a>
+      <a class="button" href="mailto:vikiea@users.noreply.github.com" data-i18n="footer.contact">Contact author</a>
+    </div>
   </main>
+
+  <script>
+    const translations = {
+      en: {
+        metaTitle: "Age Mac Privacy Policy",
+        metaDescription: "Age Mac is local-first and does not upload files, keys, passphrases, telemetry, analytics, or operation history.",
+        nav: { home: "Home", download: "Download 1.2" },
+        hero: {
+          eyebrow: "Privacy policy",
+          title: "Your encryption workflow stays local.",
+          lede: "Age Mac does not upload files, keys, passphrases, telemetry, analytics, or operation history."
+        },
+        local: {
+          caption: "Local data",
+          title: "Files and secrets stay on your Mac.",
+          body: "The app processes selected files, local settings, operation history, and age keys on this device. Saved private keys remain local in the macOS Keychain, and viewing or exporting them requires local macOS authentication."
+        },
+        network: {
+          caption: "Network access",
+          title: "Update checks read public metadata.",
+          body: "Age Mac uses Sparkle for update checks. Sparkle fetches public update metadata from:"
+        },
+        web: {
+          caption: "Web request metadata",
+          title: "The update request does not include your secrets.",
+          body: "GitHub Pages and network infrastructure may receive ordinary web request metadata such as IP address, User-Agent, and request time. Age Mac does not add files, keys, passphrases, or history to these requests."
+        },
+        footer: { github: "Open GitHub repository", contact: "Contact author" }
+      },
+      zh: {
+        metaTitle: "Age Mac 隐私政策",
+        metaDescription: "Age Mac 是本地优先的 macOS 加解密应用，不上传文件、密钥、密码、遥测、分析或操作历史。",
+        nav: { home: "首页", download: "下载 1.2" },
+        hero: {
+          eyebrow: "隐私政策",
+          title: "你的加密流程留在本机。",
+          lede: "Age Mac 不上传文件、密钥、密码、遥测、分析数据或操作历史。"
+        },
+        local: {
+          caption: "本地数据",
+          title: "文件和敏感信息都留在你的 Mac 上。",
+          body: "应用只在本机处理你选择的文件、本地设置、操作历史和 age 密钥。已保存私钥保留在 macOS Keychain 中，查看或导出私钥需要本机 macOS 验证。"
+        },
+        network: {
+          caption: "网络访问",
+          title: "更新检查只读取公开元数据。",
+          body: "Age Mac 使用 Sparkle 检测更新。Sparkle 会读取以下公开更新元数据："
+        },
+        web: {
+          caption: "Web 请求元数据",
+          title: "更新请求不会包含你的敏感信息。",
+          body: "GitHub Pages 和网络基础设施可能接收到普通 Web 请求元数据，例如 IP 地址、User-Agent 和请求时间。Age Mac 不会把文件、密钥、密码或历史记录加入这些请求。"
+        },
+        footer: { github: "打开 GitHub 仓库", contact: "联系作者" }
+      }
+    };
+
+    function readPath(source, path) {
+      return path.split(".").reduce((value, key) => value && value[key], source);
+    }
+
+    function setLanguage(language) {
+      const selected = translations[language] ? language : "en";
+      const dictionary = translations[selected];
+      document.documentElement.lang = selected === "zh" ? "zh-CN" : "en";
+      document.title = dictionary.metaTitle;
+      const description = document.querySelector('meta[name="description"]');
+      if (description) description.setAttribute("content", dictionary.metaDescription);
+      document.querySelectorAll("[data-i18n]").forEach((node) => {
+        const value = readPath(dictionary, node.dataset.i18n);
+        if (typeof value === "string") {
+          node.textContent = value;
+        }
+      });
+      document.querySelectorAll("[data-lang-button]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.langButton === selected));
+      });
+      window.localStorage.setItem("age-mac-language", selected);
+    }
+
+    function initialLanguage() {
+      const params = new URLSearchParams(window.location.search);
+      const requested = params.get("lang");
+      if (requested === "zh" || requested === "en") {
+        return requested;
+      }
+      const saved = window.localStorage.getItem("age-mac-language");
+      return saved === "zh" || saved === "en" ? saved : "en";
+    }
+
+    document.querySelectorAll("[data-lang-button]").forEach((button) => {
+      button.addEventListener("click", () => setLanguage(button.dataset.langButton));
+    });
+    setLanguage(initialLanguage());
+  </script>
 </body>
 </html>
