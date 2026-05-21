@@ -8,6 +8,7 @@ import SwiftUI
 
 struct KeysView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var workspace: WorkspaceStore
 
     var body: some View {
         let strings = store.strings
@@ -29,7 +30,7 @@ struct KeysView: View {
                     Label(strings.importFromFile, systemImage: "square.and.arrow.down")
                 }
                 Button {
-                    store.generateKeyPair()
+                    workspace.generateKeyPair()
                 } label: {
                     Label(strings.generateKey, systemImage: "sparkles")
                 }
@@ -49,18 +50,18 @@ struct KeysView: View {
         GlassCard {
             Label(strings.manualImport, systemImage: "keyboard")
                 .font(.headline)
-            TextField(strings.keyName, text: $store.importKeyName)
+            TextField(strings.keyName, text: $workspace.importKeyName)
                 .textFieldStyle(.roundedBorder)
-            TextField(strings.publicKey, text: $store.importPublicKey, axis: .vertical)
+            TextField(strings.publicKey, text: $workspace.importPublicKey, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...4)
-            TextField(strings.privateKeyOptional, text: $store.importPrivateKey, axis: .vertical)
+            TextField(strings.privateKeyOptional, text: $workspace.importPrivateKey, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...4)
             HStack {
                 Spacer()
                 Button {
-                    store.importKey()
+                    workspace.importKey()
                 } label: {
                     Label(strings.importKey, systemImage: "plus.circle")
                 }

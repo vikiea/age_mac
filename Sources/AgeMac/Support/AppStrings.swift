@@ -57,6 +57,7 @@ struct AppStrings {
     var noKeySelection: String { text(en: "Do not use a saved key", zh: "不使用已保存密钥") }
     var noKeysDescription: String { text(en: "Generate or import an age key", zh: "生成或导入一个 age 密钥") }
     var noKeysTitle: String { text(en: "No Keys", zh: "没有密钥") }
+    var newAgeMacTab: String { text(en: "New Age Mac Tab", zh: "新建 Age Mac 标签页") }
     var newAgeMacWindow: String { text(en: "New Age Mac Window", zh: "新建 Age Mac 窗口") }
     var ok: String { text(en: "OK", zh: "好") }
     var openSourceComponents: String { text(en: "Open Source Components", zh: "开源组件") }

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var workspace: WorkspaceStore
 
     var body: some View {
         ZStack {
@@ -19,11 +20,11 @@ struct ContentView: View {
             )
 
             NavigationSplitView {
-                SidebarView(selection: $store.selectedSection)
+                SidebarView(selection: $workspace.selectedSection)
                     .navigationSplitViewColumnWidth(min: 330, ideal: 360, max: 430)
             } detail: {
                 DetailScrollContainer {
-                    switch store.selectedSection ?? .encrypt {
+                    switch workspace.selectedSection ?? .encrypt {
                     case .encrypt:
                         EncryptView()
                     case .decrypt:
@@ -44,12 +45,20 @@ struct ContentView: View {
         .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
         .windowAppearance(store.settings.appearance)
         .alert("Age Mac", isPresented: Binding(
-            get: { store.alertMessage != nil },
-            set: { if !$0 { store.alertMessage = nil } }
+            get: { store.alertMessage != nil || workspace.alertMessage != nil },
+            set: {
+                if !$0 {
+                    store.alertMessage = nil
+                    workspace.alertMessage = nil
+                }
+            }
         )) {
-            Button(store.strings.ok) { store.alertMessage = nil }
+            Button(store.strings.ok) {
+                store.alertMessage = nil
+                workspace.alertMessage = nil
+            }
         } message: {
-            Text(store.alertMessage ?? "")
+            Text(store.alertMessage ?? workspace.alertMessage ?? "")
         }
     }
 }

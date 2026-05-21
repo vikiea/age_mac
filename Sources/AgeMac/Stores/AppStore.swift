@@ -4,43 +4,20 @@
  * See LICENSE for details.
  */
 
+import AppKit
 import Combine
 import Foundation
-import AppKit
 
 @MainActor
 final class AppStore: ObservableObject {
-    @Published var selectedSection: AppSection? = .encrypt
-
-    @Published var encryptFiles: [SelectedFile] = []
-    @Published var decryptFiles: [SelectedFile] = []
     @Published var keys: [KeyEntry] = []
     @Published var operations: [OperationRecord] = []
     @Published var settings: AppSettings = .defaults()
     @Published private(set) var renderedGaussianTransparencyOpacity = AppSettings.defaults().gaussianTransparencyOpacity
-    @Published var currentTask: RunningOperation?
     @Published var alertMessage: String?
 
-    @Published var encryptMode: EncryptionMode = .batchPack
-    @Published var encryptAuthMode: AuthMode = .passphrase
-    @Published var decryptAuthMode: AuthMode = .passphrase
-    @Published var archiveBaseName: String = "archive"
-    @Published var encryptPassphrase: String = ""
-    @Published var decryptPassphrase: String = ""
-    @Published var publicKeyInput: String = ""
-    @Published var privateKeyInput: String = ""
-    @Published var selectedEncryptKeyID: UUID?
-    @Published var selectedDecryptKeyID: UUID?
-    @Published var importKeyName: String = ""
-    @Published var importPublicKey: String = ""
-    @Published var importPrivateKey: String = ""
-
-    private let engine = AgeEngineClient()
     private let persistence: AppPersistence
     private let keychain = KeychainSecretStore()
-    private var activeProcess: Process?
-    private var activeRecordID: UUID?
-    private var userCancelled = false
 
     var strings: AppStrings {
         AppStrings(language: settings.language)
@@ -52,51 +29,8 @@ final class AppStore: ObservableObject {
         importAgeConfigKeysIfNeeded()
     }
 
-    var selectedEncryptKey: KeyEntry? {
-        keys.first { $0.id == selectedEncryptKeyID }
-    }
-
-    var selectedDecryptKey: KeyEntry? {
-        keys.first { $0.id == selectedDecryptKeyID }
-    }
-
-    var encryptTask: RunningOperation? {
-        task(for: .encrypt)
-    }
-
-    var decryptTask: RunningOperation? {
-        task(for: .decrypt)
-    }
-
     var effectiveGaussianTransparencyOpacity: Int {
         renderedGaussianTransparencyOpacity
-    }
-
-    var canStartEncrypt: Bool {
-        !encryptFiles.isEmpty && currentTask?.status != .running
-    }
-
-    var canStartDecrypt: Bool {
-        !decryptFiles.isEmpty && currentTask?.status != .running
-    }
-
-    func chooseEncryptFiles() {
-        addEncryptFiles(FilePanelService.chooseFiles())
-    }
-
-    func chooseEncryptFolder() {
-        guard let folder = FilePanelService.chooseFolder() else { return }
-        addEncryptFiles(FilePanelService.filesInFolder(folder))
-    }
-
-    func chooseDecryptFiles() {
-        addDecryptFiles(FilePanelService.chooseFiles(allowedExtensions: ["age"]))
-    }
-
-    func chooseDecryptFolder() {
-        guard let folder = FilePanelService.chooseFolder() else { return }
-        let files = FilePanelService.filesInFolder(folder).filter { $0.pathExtension.lowercased() == "age" }
-        addDecryptFiles(files)
     }
 
     func chooseOutputDirectory() {
@@ -105,56 +39,30 @@ final class AppStore: ObservableObject {
         saveSettings()
     }
 
-    func addEncryptFiles(_ urls: [URL]) {
-        merge(urls: urls, into: &encryptFiles)
-    }
-
-    func addDecryptFiles(_ urls: [URL]) {
-        merge(urls: urls, into: &decryptFiles)
-    }
-
-    func removeEncryptFile(_ file: SelectedFile) {
-        encryptFiles.removeAll { $0.id == file.id }
-    }
-
-    func removeDecryptFile(_ file: SelectedFile) {
-        decryptFiles.removeAll { $0.id == file.id }
-    }
-
-    func clearEncryptFiles() {
-        encryptFiles.removeAll()
-    }
-
-    func clearDecryptFiles() {
-        decryptFiles.removeAll()
-    }
-
-    func generateKeyPair() {
+    func generateKeyPairForWorkspace() async -> KeyEntry? {
         let language = settings.language
-        Task {
-            do {
-                let key = try await Task.detached {
-                    try AgeEngineClient().generateKeyPair(language: language)
-                }.value
-                let storedKey = storePrivateKeyIfNeeded(for: key)
-                keys.insert(storedKey, at: 0)
-                selectedEncryptKeyID = storedKey.id
-                selectedDecryptKeyID = storedKey.id
-                saveKeys()
-            } catch {
-                alertMessage = localizedErrorDescription(error)
-            }
+        do {
+            let key = try await Task.detached {
+                try AgeEngineClient().generateKeyPair(language: language)
+            }.value
+            let storedKey = storePrivateKeyIfNeeded(for: key)
+            keys.insert(storedKey, at: 0)
+            saveKeys()
+            return storedKey
+        } catch {
+            alertMessage = localizedErrorDescription(error)
+            return nil
         }
     }
 
-    func importKey() {
-        let publicKey = importPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        let privateKey = importPrivateKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    func importKey(name draftName: String, publicKey draftPublicKey: String, privateKey draftPrivateKey: String) -> KeyEntry? {
+        let publicKey = draftPublicKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let privateKey = draftPrivateKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !publicKey.isEmpty else {
             alertMessage = strings.requirePublicKey()
-            return
+            return nil
         }
-        let name = importKeyName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         var key = KeyEntry(
             id: UUID(),
             name: name.isEmpty ? "Imported key" : name,
@@ -166,10 +74,8 @@ final class AppStore: ObservableObject {
             key = storePrivateKeyIfNeeded(for: key)
         }
         keys.insert(key, at: 0)
-        importKeyName = ""
-        importPublicKey = ""
-        importPrivateKey = ""
         saveKeys()
+        return key
     }
 
     func importKeyFromFile() {
@@ -239,127 +145,7 @@ final class AppStore: ObservableObject {
     func deleteKey(_ key: KeyEntry) {
         keychain.deletePrivateKey(for: key.id)
         keys.removeAll { $0.id == key.id }
-        if selectedEncryptKeyID == key.id {
-            selectedEncryptKeyID = nil
-        }
-        if selectedDecryptKeyID == key.id {
-            selectedDecryptKeyID = nil
-        }
         saveKeys()
-    }
-
-    func startEncrypt() {
-        guard currentTask?.status != .running else { return }
-        guard !encryptFiles.isEmpty else {
-            alertMessage = strings.requireEncryptFiles()
-            return
-        }
-
-        let strings = strings
-        let secret: String
-        let recipientInfo: String
-        let authArgument: String
-        switch encryptAuthMode {
-        case .passphrase:
-            guard !encryptPassphrase.isEmpty else {
-                alertMessage = strings.requireEncryptPassphrase()
-                return
-            }
-            secret = encryptPassphrase
-            recipientInfo = strings.passphrase
-            authArgument = "passphrase"
-        case .key:
-            let key = selectedEncryptKey?.publicKey ?? publicKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !key.isEmpty else {
-                alertMessage = strings.requirePublicKey()
-                return
-            }
-            secret = key
-            recipientInfo = key.prefix(24) + "..."
-            authArgument = "publicKey"
-        }
-
-        let outputName = computedArchiveName()
-        let command: EngineCommand = encryptMode == .batchPack
-            ? .encryptBatch(outputName: outputName, compress: settings.compressEnabled)
-            : .encryptSeparate(compress: settings.compressEnabled)
-        let modeLabel = strings.operationModeLabel(mode: encryptMode, compress: settings.compressEnabled)
-
-        runOperation(
-            kind: .encrypt,
-            modeLabel: modeLabel,
-            title: strings.encryptFilesTitle(encryptFiles.count),
-            files: encryptFiles,
-            request: EngineRequest(
-                command: command,
-                files: encryptFiles,
-                outputDirectory: settings.outputDirectory,
-                authArgument: authArgument,
-                secret: secret,
-                duplicateStrategy: settings.duplicateStrategy,
-                concurrency: settings.concurrency,
-                language: settings.language
-            ),
-            recipientInfo: String(recipientInfo)
-        )
-    }
-
-    func startDecrypt() {
-        guard currentTask?.status != .running else { return }
-        guard !decryptFiles.isEmpty else {
-            alertMessage = strings.requireDecryptFiles()
-            return
-        }
-
-        let strings = strings
-        let secret: String
-        let recipientInfo: String
-        let authArgument: String
-        switch decryptAuthMode {
-        case .passphrase:
-            guard !decryptPassphrase.isEmpty else {
-                alertMessage = strings.requireDecryptPassphrase()
-                return
-            }
-            secret = decryptPassphrase
-            recipientInfo = strings.passphrase
-            authArgument = "passphrase"
-        case .key:
-            let key = selectedDecryptKey.flatMap(privateKey(for:)) ?? privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !key.isEmpty else {
-                alertMessage = strings.requirePrivateKey()
-                return
-            }
-            secret = key
-            recipientInfo = strings.privateKey
-            authArgument = "privateKey"
-        }
-
-        runOperation(
-            kind: .decrypt,
-            modeLabel: OperationKind.decrypt.title(in: settings.language),
-            title: strings.decryptFilesTitle(decryptFiles.count),
-            files: decryptFiles,
-            request: EngineRequest(
-                command: .decrypt,
-                files: decryptFiles,
-                outputDirectory: settings.outputDirectory,
-                authArgument: authArgument,
-                secret: secret,
-                duplicateStrategy: settings.duplicateStrategy,
-                concurrency: settings.concurrency,
-                language: settings.language
-            ),
-            recipientInfo: recipientInfo
-        )
-    }
-
-    func cancelCurrentTask() {
-        guard currentTask?.status == .running else { return }
-        userCancelled = true
-        activeProcess?.terminate()
-        currentTask?.status = .cancelled
-        currentTask?.phase = strings.phaseCancelling()
     }
 
     func reveal(path: String) {
@@ -371,19 +157,19 @@ final class AppStore: ObservableObject {
         saveHistory()
     }
 
-    func removeCurrentTask(kind: OperationKind) {
-        guard let task = task(for: kind), task.status != .running else { return }
-        if currentTask?.id == task.id {
-            currentTask = nil
-        }
-        removeOperation(id: task.id)
-    }
-
     func removeOperation(id: UUID) {
         operations.removeAll { $0.id == id }
-        if currentTask?.id == id {
-            currentTask = nil
-        }
+        saveHistory()
+    }
+
+    func addOperation(_ record: OperationRecord) {
+        operations.insert(record, at: 0)
+        saveHistory()
+    }
+
+    func updateOperation(id: UUID, mutate: (inout OperationRecord) -> Void) {
+        guard let index = operations.firstIndex(where: { $0.id == id }) else { return }
+        mutate(&operations[index])
         saveHistory()
     }
 
@@ -420,6 +206,20 @@ final class AppStore: ObservableObject {
         saveSettings()
     }
 
+    func localizedErrorDescription(_ error: Error) -> String {
+        if let engineError = error as? EngineClientError {
+            return engineError.errorDescription(in: settings.language)
+        }
+        return error.localizedDescription
+    }
+
+    func privateKey(for key: KeyEntry) -> String? {
+        if let inlinePrivateKey = key.privateKey, !inlinePrivateKey.isEmpty {
+            return inlinePrivateKey
+        }
+        return try? keychain.readPrivateKey(for: key.id)
+    }
+
     private func updateGaussianTransparencyOpacity(_ opacity: Int) {
         let clampedOpacity = AppSettings.clampGaussianTransparencyOpacity(opacity)
         if renderedGaussianTransparencyOpacity != clampedOpacity {
@@ -428,149 +228,6 @@ final class AppStore: ObservableObject {
         if settings.gaussianTransparencyOpacity != clampedOpacity {
             settings.gaussianTransparencyOpacity = clampedOpacity
         }
-    }
-
-    private func runOperation(
-        kind: OperationKind,
-        modeLabel: String,
-        title: String,
-        files: [SelectedFile],
-        request: EngineRequest,
-        recipientInfo: String
-    ) {
-        let recordID = UUID()
-        let record = OperationRecord(
-            id: recordID,
-            kind: kind,
-            modeLabel: modeLabel,
-            inputFiles: files.map(\.name),
-            outputPath: request.outputDirectory,
-            recipientInfo: recipientInfo,
-            status: .running,
-            errorMessage: nil,
-            outputs: [],
-            timestamp: Date()
-        )
-
-        operations.insert(record, at: 0)
-        currentTask = .started(id: recordID, kind: kind, title: title, phase: strings.phasePreparing(), total: files.count)
-        activeRecordID = recordID
-        userCancelled = false
-        saveHistory()
-
-        Task {
-            do {
-                let result = try await engine.run(
-                    request: request,
-                    onProcess: { [weak self] process in
-                        Task { @MainActor in
-                            self?.activeProcess = process
-                        }
-                    },
-                    onEvent: { [weak self] event in
-                        Task { @MainActor in
-                            self?.handleEngineEvent(event)
-                        }
-                    }
-                )
-                finishOperation(id: recordID, result: result)
-            } catch {
-                failOperation(id: recordID, error: error)
-            }
-        }
-    }
-
-    private func handleEngineEvent(_ event: EngineEvent) {
-        if event.event == "progress" || event.event == "done" {
-            currentTask?.phase = localizedEnginePhase(event.phase) ?? currentTask?.phase ?? ""
-            currentTask?.progress = event.progress ?? currentTask?.progress ?? 0
-            currentTask?.processed = event.processed ?? currentTask?.processed ?? 0
-            currentTask?.total = event.total ?? currentTask?.total ?? 0
-            currentTask?.success = event.success ?? currentTask?.success ?? 0
-            currentTask?.fail = event.fail ?? currentTask?.fail ?? 0
-        }
-        if let output = event.output, currentTask?.outputs.contains(output) == false {
-            currentTask?.outputs.append(output)
-        }
-        if let outputs = event.outputs, !outputs.isEmpty {
-            currentTask?.outputs = outputs
-        }
-        if event.event == "error" {
-            currentTask?.status = .failed
-            currentTask?.errorMessage = event.message
-        }
-    }
-
-    private func localizedEnginePhase(_ phase: String?) -> String? {
-        guard let phase, !phase.isEmpty else { return nil }
-        switch phase {
-        case "Packing":
-            return settings.language == .english ? "Packing" : "打包中"
-        case "Complete":
-            return strings.phaseComplete()
-        case let value where value.hasPrefix("解密中"):
-            guard settings.language == .english else { return value }
-            let label = value.dropFirst("解密中".count).trimmingCharacters(in: .whitespaces)
-            return label.isEmpty ? "Decrypting" : "Decrypting \(label)"
-        default:
-            return phase
-        }
-    }
-
-    private func finishOperation(id: UUID, result: EngineResult) {
-        activeProcess = nil
-        guard let index = operations.firstIndex(where: { $0.id == id }) else { return }
-        operations[index].status = .success
-        operations[index].outputs = result.outputs
-        operations[index].outputPath = settings.outputDirectory
-
-        currentTask?.status = .success
-        currentTask?.phase = strings.phaseComplete()
-        currentTask?.progress = 1
-        currentTask?.success = result.success
-        currentTask?.fail = result.fail
-        currentTask?.outputs = result.outputs
-        saveHistory()
-    }
-
-    private func failOperation(id: UUID, error: Error) {
-        activeProcess = nil
-        guard let index = operations.firstIndex(where: { $0.id == id }) else { return }
-        let status: OperationStatus = userCancelled ? .cancelled : .failed
-        let message = userCancelled ? strings.phaseCancelled() : localizedErrorDescription(error)
-        operations[index].status = status
-        operations[index].errorMessage = message
-
-        currentTask?.status = status
-        currentTask?.phase = status == .cancelled ? strings.phaseCancelled() : strings.phaseFailed()
-        currentTask?.errorMessage = message
-        userCancelled = false
-        saveHistory()
-    }
-
-    private func localizedErrorDescription(_ error: Error) -> String {
-        if let engineError = error as? EngineClientError {
-            return engineError.errorDescription(in: settings.language)
-        }
-        return error.localizedDescription
-    }
-
-    private func merge(urls: [URL], into files: inout [SelectedFile]) {
-        let existing = Set(files.map(\.path))
-        let additions = urls
-            .filter { !existing.contains($0.path) }
-            .map(SelectedFile.init(url:))
-        files.append(contentsOf: additions)
-    }
-
-    private func computedArchiveName() -> String {
-        let base = archiveBaseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "archive" : archiveBaseName
-        return settings.compressEnabled ? "\(base).tar.gz.age" : "\(base).tar.age"
-    }
-
-    private func task(for kind: OperationKind) -> RunningOperation? {
-        guard let currentTask, currentTask.kind == kind else { return nil }
-        return currentTask
     }
 
     private func saveKeyFile(_ key: KeyEntry) {
@@ -598,8 +255,6 @@ final class AppStore: ObservableObject {
         operations = state.operations
         settings = state.settings
         renderedGaussianTransparencyOpacity = settings.gaussianTransparencyOpacity
-        selectedEncryptKeyID = keys.first?.id
-        selectedDecryptKeyID = keys.first(where: { $0.hasPrivateKey })?.id
     }
 
     @discardableResult
@@ -621,8 +276,6 @@ final class AppStore: ObservableObject {
         }
         guard !additions.isEmpty else { return 0 }
         keys.insert(contentsOf: additions, at: 0)
-        selectedEncryptKeyID = keys.first(where: { !$0.publicKey.isEmpty })?.id
-        selectedDecryptKeyID = keys.first(where: { $0.hasPrivateKey })?.id
         saveKeys()
         return additions.count
     }
@@ -659,13 +312,6 @@ final class AppStore: ObservableObject {
         } catch {
             alertMessage = strings.savedStateFailed(error.localizedDescription)
         }
-    }
-
-    private func privateKey(for key: KeyEntry) -> String? {
-        if let inlinePrivateKey = key.privateKey, !inlinePrivateKey.isEmpty {
-            return inlinePrivateKey
-        }
-        return try? keychain.readPrivateKey(for: key.id)
     }
 
     private func storePrivateKeyIfNeeded(for key: KeyEntry) -> KeyEntry {

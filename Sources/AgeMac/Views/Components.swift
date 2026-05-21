@@ -125,6 +125,7 @@ struct FileListView: View {
 
 struct TaskStatusCard: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var workspace: WorkspaceStore
     var task: RunningOperation?
     var onRemove: () -> Void
 
@@ -182,7 +183,7 @@ struct TaskStatusCard: View {
 
                 if task.status == .running {
                     Button(role: .destructive) {
-                        store.cancelCurrentTask()
+                        workspace.cancelCurrentTask()
                     } label: {
                         Label(store.strings.cancelTask, systemImage: "stop.circle")
                     }

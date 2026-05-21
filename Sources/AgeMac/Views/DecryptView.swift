@@ -8,6 +8,7 @@ import SwiftUI
 
 struct DecryptView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var workspace: WorkspaceStore
 
     var body: some View {
         let strings = store.strings
@@ -18,20 +19,20 @@ struct DecryptView: View {
             systemImage: "lock.open.fill"
         )
 
-        TaskStatusCard(task: store.decryptTask) {
-            store.removeCurrentTask(kind: .decrypt)
+        TaskStatusCard(task: workspace.decryptTask) {
+            workspace.removeCurrentTask(kind: .decrypt)
         }
 
         GlassCard {
             authModePicker
 
-            if store.decryptAuthMode == .passphrase {
-                SecureField(strings.passphrase, text: $store.decryptPassphrase)
+            if workspace.decryptAuthMode == .passphrase {
+                SecureField(strings.passphrase, text: $workspace.decryptPassphrase)
                     .textFieldStyle(.roundedBorder)
             } else {
-                KeyPicker(title: strings.savedPrivateKeys, keys: store.keys, selection: $store.selectedDecryptKeyID, requiresPrivateKey: true)
-                if store.selectedDecryptKeyID == nil {
-                    TextField(strings.pastePrivateKeyPlaceholder(), text: $store.privateKeyInput)
+                KeyPicker(title: strings.savedPrivateKeys, keys: store.keys, selection: $workspace.selectedDecryptKeyID, requiresPrivateKey: true)
+                if workspace.selectedDecryptKey == nil {
+                    TextField(strings.pastePrivateKeyPlaceholder(), text: $workspace.privateKeyInput)
                         .textFieldStyle(.roundedBorder)
                         .textSelection(.enabled)
                 }
@@ -44,39 +45,39 @@ struct DecryptView: View {
                     .font(.headline)
                 Spacer()
                 Button {
-                    store.chooseDecryptFiles()
+                    workspace.chooseDecryptFiles()
                 } label: {
                     Label(strings.addEncryptedAge, systemImage: "plus")
                 }
                 Button {
-                    store.chooseDecryptFolder()
+                    workspace.chooseDecryptFolder()
                 } label: {
                     Label(strings.scanFolder, systemImage: "folder.badge.plus")
                 }
                 Button(strings.clear) {
-                    store.clearDecryptFiles()
+                    workspace.clearDecryptFiles()
                 }
-                .disabled(store.decryptFiles.isEmpty)
+                .disabled(workspace.decryptFiles.isEmpty)
             }
 
-            FileListView(files: store.decryptFiles) { file in
-                store.removeDecryptFile(file)
+            FileListView(files: workspace.decryptFiles) { file in
+                workspace.removeDecryptFile(file)
             }
 
             PrimaryActionCell(
                 title: strings.startDecrypt,
                 subtitle: strings.decryptedOutputSubtitle(AppFormatters.shortPath(store.settings.outputDirectory)),
                 systemImage: "lock.open.fill",
-                disabled: !store.canStartDecrypt
+                disabled: !workspace.canStartDecrypt
             ) {
-                store.startDecrypt()
+                workspace.startDecrypt()
             }
             .keyboardShortcut(.return, modifiers: [.command])
         }
     }
 
     private var authModePicker: some View {
-        Picker(store.strings.decryptMethod, selection: $store.decryptAuthMode) {
+        Picker(store.strings.decryptMethod, selection: $workspace.decryptAuthMode) {
             ForEach(AuthMode.allCases) { mode in
                 Text(mode.title(in: store.settings.language)).tag(mode)
             }

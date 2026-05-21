@@ -8,6 +8,7 @@ import SwiftUI
 
 struct EncryptView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var workspace: WorkspaceStore
 
     var body: some View {
         let strings = store.strings
@@ -18,8 +19,8 @@ struct EncryptView: View {
             systemImage: "lock.fill"
         )
 
-        TaskStatusCard(task: store.encryptTask) {
-            store.removeCurrentTask(kind: .encrypt)
+        TaskStatusCard(task: workspace.encryptTask) {
+            workspace.removeCurrentTask(kind: .encrypt)
         }
 
         GlassCard {
@@ -30,14 +31,14 @@ struct EncryptView: View {
                     .onChange(of: store.settings.compressEnabled) { _, _ in store.saveSettings() }
                     .fixedSize()
 
-                Text(store.encryptMode.detail(in: store.settings.language))
+                Text(workspace.encryptMode.detail(in: store.settings.language))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if store.encryptMode == .batchPack {
+            if workspace.encryptMode == .batchPack {
                 archiveNameRow
             }
         }
@@ -45,13 +46,13 @@ struct EncryptView: View {
         GlassCard {
             authModePicker
 
-            if store.encryptAuthMode == .passphrase {
-                SecureField(strings.passphrase, text: $store.encryptPassphrase)
+            if workspace.encryptAuthMode == .passphrase {
+                SecureField(strings.passphrase, text: $workspace.encryptPassphrase)
                     .textFieldStyle(.roundedBorder)
             } else {
-                KeyPicker(title: strings.savedPublicKeys, keys: store.keys, selection: $store.selectedEncryptKeyID, requiresPrivateKey: false)
-                if store.selectedEncryptKeyID == nil {
-                    TextField(strings.pastePublicKeyPlaceholder(), text: $store.publicKeyInput)
+                KeyPicker(title: strings.savedPublicKeys, keys: store.keys, selection: $workspace.selectedEncryptKeyID, requiresPrivateKey: false)
+                if workspace.selectedEncryptKey == nil {
+                    TextField(strings.pastePublicKeyPlaceholder(), text: $workspace.publicKeyInput)
                         .textFieldStyle(.roundedBorder)
                         .textSelection(.enabled)
                 }
@@ -64,39 +65,39 @@ struct EncryptView: View {
                     .font(.headline)
                 Spacer()
                 Button {
-                    store.chooseEncryptFiles()
+                    workspace.chooseEncryptFiles()
                 } label: {
                     Label(strings.addFiles, systemImage: "plus")
                 }
                 Button {
-                    store.chooseEncryptFolder()
+                    workspace.chooseEncryptFolder()
                 } label: {
                     Label(strings.addFolder, systemImage: "folder.badge.plus")
                 }
                 Button(strings.clear) {
-                    store.clearEncryptFiles()
+                    workspace.clearEncryptFiles()
                 }
-                .disabled(store.encryptFiles.isEmpty)
+                .disabled(workspace.encryptFiles.isEmpty)
             }
 
-            FileListView(files: store.encryptFiles) { file in
-                store.removeEncryptFile(file)
+            FileListView(files: workspace.encryptFiles) { file in
+                workspace.removeEncryptFile(file)
             }
 
             PrimaryActionCell(
                 title: strings.startEncrypt,
                 subtitle: strings.encryptedOutputSubtitle(AppFormatters.shortPath(store.settings.outputDirectory)),
                 systemImage: "lock.fill",
-                disabled: !store.canStartEncrypt
+                disabled: !workspace.canStartEncrypt
             ) {
-                store.startEncrypt()
+                workspace.startEncrypt()
             }
             .keyboardShortcut(.return, modifiers: [.command])
         }
     }
 
     private var modePicker: some View {
-        Picker(store.strings.encryptMode, selection: $store.encryptMode) {
+        Picker(store.strings.encryptMode, selection: $workspace.encryptMode) {
             ForEach(EncryptionMode.allCases) { mode in
                 Text(mode.title(in: store.settings.language)).tag(mode)
             }
@@ -107,7 +108,7 @@ struct EncryptView: View {
 
     private var archiveNameRow: some View {
         HStack(spacing: 10) {
-            TextField(store.strings.archiveNamePlaceholder, text: $store.archiveBaseName)
+            TextField(store.strings.archiveNamePlaceholder, text: $workspace.archiveBaseName)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 120)
             Text(store.settings.compressEnabled ? ".tar.gz.age" : ".tar.age")
@@ -117,7 +118,7 @@ struct EncryptView: View {
     }
 
     private var authModePicker: some View {
-        Picker(store.strings.encryptMethod, selection: $store.encryptAuthMode) {
+        Picker(store.strings.encryptMethod, selection: $workspace.encryptAuthMode) {
             ForEach(AuthMode.allCases) { mode in
                 Text(mode.title(in: store.settings.language)).tag(mode)
             }
