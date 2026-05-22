@@ -8,7 +8,7 @@ See LICENSE for details.
 
 ## Goal
 
-Build a native macOS version of Age Android in `/Users/qinfuling/www/github/vikiea/age_mac`, with equivalent local age encryption/decryption, key management, operation history, configurable output behavior, and a Liquid Glass-style desktop interface.
+Build a native macOS version of Age Android in this repository, with equivalent local age encryption/decryption, key management, operation history, configurable output behavior, and a Liquid Glass-style desktop interface.
 
 ## Product Shape
 

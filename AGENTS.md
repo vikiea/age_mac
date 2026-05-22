@@ -8,7 +8,7 @@ See LICENSE for details.
 
 ## Project Identity
 
-This repository is the standalone macOS companion app for Age Android. Treat it as an independent project from `/Users/qinfuling/www/github/person/age_android`; inspect the Android repo only when intentionally comparing behavior.
+This repository is the standalone macOS companion app for Age Android. Treat it as an independent project from any Android companion checkout; inspect Android code only when intentionally comparing behavior.
 
 The app is a SwiftPM macOS GUI app plus a local Go age engine:
 
@@ -57,6 +57,6 @@ For engine behavior changes, also run a real roundtrip with `Engine/age-engine` 
 ## Git Hygiene
 
 - This repo is intentionally standalone and has its own `.git`.
-- Do not edit `age_android` while working on `age_mac` unless the user asks for a cross-project change.
+- Do not edit Android companion code while working on `age_mac` unless the user asks for a cross-project change.
 - Build outputs are ignored: `.build/`, `dist/`, and `Engine/age-engine`.
 - Leave unrelated local changes alone.

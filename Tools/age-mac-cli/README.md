@@ -5,7 +5,7 @@
 ## Install
 
 ```bash
-cd ~/www/github/vikiea/age_mac/Tools/age-mac-cli
+cd /path/to/age_mac/Tools/age-mac-cli
 make install-local
 ```
 
@@ -19,7 +19,7 @@ The binary is installed at:
 
 ```bash
 age-mac --json doctor
-age-mac init --repo /Users/qinfuling/www/github/vikiea/age_mac
+age-mac init --repo /path/to/age_mac
 age-mac --json dev verify
 age-mac --verbose --json dev package --arch all --version 1.3.2
 age-mac dev run
@@ -47,7 +47,7 @@ Use `--verbose` for long commands to print each step, working directory, command
 Run this to create or refresh the file:
 
 ```bash
-age-mac init --repo /Users/qinfuling/www/github/vikiea/age_mac
+age-mac init --repo /path/to/age_mac
 ```
 
 The generated file includes these configurable values:
@@ -72,7 +72,7 @@ When `--json` is provided:
 Success shape:
 
 ```json
-{"ok":true,"action":"doctor","repo":"/Users/qinfuling/www/github/vikiea/age_mac","checks":[]}
+{"ok":true,"action":"doctor","repo":"/path/to/age_mac","checks":[]}
 ```
 
 Error shape:

@@ -1,6 +1,6 @@
 ---
 name: age-mac-development
-description: Develop, build, run, debug, or extend the Age Mac standalone macOS app. Use when working in /Users/qinfuling/www/github/vikiea/age_mac, changing SwiftUI UI, the Go age engine, long-running task execution, key/history/settings persistence, Liquid Glass styling, or project verification.
+description: Develop, build, run, debug, package, verify, or release the Age Mac standalone macOS app. Use when working in this repository, changing SwiftUI UI, the Go age engine, long-running task execution, key/history/settings persistence, Liquid Glass styling, project verification, the age-mac CLI, or release workflows.
 ---
 
 <!--
@@ -13,7 +13,7 @@ See LICENSE for details.
 
 ## Scope
 
-Use this skill for the standalone `age_mac` project. Do not edit the sibling `age_android` project unless the user explicitly asks for cross-project changes.
+Use this skill for the standalone `age_mac` project. Do not edit Android companion code unless the user explicitly asks for cross-project changes.
 
 ## Architecture Map
 
@@ -43,7 +43,7 @@ Use this skill for the standalone `age_mac` project. Do not edit the sibling `ag
 
 ## Build And Run
 
-From `/Users/qinfuling/www/github/vikiea/age_mac`:
+From the repository root:
 
 ```bash
 swift build
@@ -54,6 +54,62 @@ env -u GOROOT go test ./...
 Use `./script/build_and_run.sh` for a normal launch. The script builds `Engine/age-engine`, builds SwiftPM, stages `dist/AgeMac.app`, copies the engine into app resources, and launches the app bundle.
 
 The local shell may export a stale `GOROOT` from another Go installation. Use `env -u GOROOT` for manual Go commands and keep that protection in scripts.
+
+## Age Mac CLI
+
+Use the installed `age-mac` CLI for repeatable project operations, especially release work:
+
+```bash
+command -v age-mac
+age-mac --json doctor
+```
+
+`doctor` reports the resolved config path, repository, default base branch, default remote, script paths, release asset naming, tool commands, and GitHub auth source. If defaults are missing:
+
+```bash
+age-mac init --repo /path/to/age_mac
+```
+
+Config lives at `~/.age-mac/config.toml`. Prefer config defaults for repeated work and command flags for one-off overrides. Auth uses `gh` first; `GH_TOKEN` or `GITHUB_TOKEN` can also be used, but do not print token values.
+
+Configurable groups:
+
+- `[repo]`: `default_repo`, `default_base`, `default_remote`
+- `[paths]`: `build_script`, `release_script`, `release_dir`, `app_bundle`
+- `[tools]`: `swift`, `go`, `git`, `gh`, `hdiutil`, `codesign`, `lldb`, `xmllint`, `lipo`
+- `[release]`: `asset_name`, `display_name`
+
+Safe local commands:
+
+```bash
+age-mac --json repo status
+age-mac --json dev verify
+age-mac --json dev roundtrip
+age-mac --verbose --json dev package --arch all --version 1.3.2
+age-mac --verbose --json repo release verify --version 1.3.2
+```
+
+Preview write commands first when possible:
+
+```bash
+age-mac repo commit --path Tools/age-mac-cli --message "chore: update project automation cli" --dry-run
+age-mac repo push --set-upstream --dry-run
+age-mac repo pr create --fill --draft --dry-run
+age-mac repo release create --version 1.3.2 --title "Age Mac 1.3.2" --notes "Release notes" --asset pages/releases/AgeMac-1.3.2-universal.dmg --dry-run
+age-mac repo release publish --version 1.3.2 --dry-run
+```
+
+Only run live PR creation, release creation, release asset upload, or public release publishing when the user explicitly asks for that action. Release creation defaults to a GitHub draft; use `--live` only when the user asks to publish a non-draft release.
+
+Use repeated `--asset <PATH>` flags with `repo release create` when creating a release and uploading prepared DMGs in one command. Use `repo release verify` after publishing to validate appcast XML, local DMG images, and uploaded GitHub release asset names/sizes in one CLI-level check. Use `--verbose` for long build/package/release commands so progress goes to stderr while JSON stays clean on stdout.
+
+Use the raw `gh` escape hatch only when the high-level command is missing:
+
+```bash
+age-mac --json request -- release view v1.3.1 --json tagName,assets
+```
+
+Do not use raw mutating `gh` commands unless the user requested that exact write.
 
 ## Engine Roundtrip Check
 
