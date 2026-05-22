@@ -30,8 +30,9 @@ age-mac --json repo status
 age-mac repo commit --message "chore: update release tooling"
 age-mac repo push --set-upstream
 age-mac repo pr create --title "..." --body "..."
-age-mac repo release create --version 1.3.2 --notes-file RELEASE_NOTES.md --draft
+age-mac repo release create --version 1.3.2 --notes-file RELEASE_NOTES.md --asset pages/releases/AgeMac-1.3.2-universal.dmg
 age-mac repo release upload --version 1.3.2
+age-mac --verbose --json repo release verify --version 1.3.2
 age-mac request gh release view v1.3.2 --json tagName,assets
 ```
 
@@ -81,3 +82,5 @@ Error shape:
 ```
 
 Write commands do narrow named actions. Remote writes such as PR creation, release creation, and release asset upload require explicit subcommands and arguments. Use `--dry-run` where available to preview the underlying commands.
+
+Release creation accepts repeated `--asset <PATH>` values and forwards them to `gh release create` after the tag. `repo release verify` is the release-level check for published artifacts: it validates the appcast XML files, runs `hdiutil verify` on local DMGs, reads the GitHub release, and compares local asset names/sizes with uploaded GitHub assets.

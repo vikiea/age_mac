@@ -252,6 +252,8 @@ enum ReleaseCommands {
     Create(ReleaseCreateArgs),
     #[command(about = "Upload local DMG assets to an existing GitHub release")]
     Upload(ReleaseUploadArgs),
+    #[command(about = "Verify local appcasts, DMGs, and GitHub release assets")]
+    Verify(ReleaseVerifyArgs),
     #[command(about = "Build DMGs and create a GitHub release with assets")]
     Publish(ReleasePublishArgs),
 }
@@ -278,12 +280,20 @@ struct ReleaseCreateArgs {
     notes: Option<String>,
     #[arg(long, value_name = "PATH")]
     notes_file: Option<PathBuf>,
+    #[arg(long = "asset", value_name = "PATH")]
+    assets: Vec<PathBuf>,
     #[arg(long, help = "Create a public release instead of a draft")]
     live: bool,
     #[arg(long)]
     prerelease: bool,
     #[arg(long)]
     dry_run: bool,
+}
+
+#[derive(Args, Debug)]
+struct ReleaseVerifyArgs {
+    #[arg(long, value_name = "VERSION")]
+    version: String,
 }
 
 #[derive(Args, Debug)]
@@ -1315,6 +1325,7 @@ fn run_release_command(
         ReleaseCommands::View(args) => release_view(repo, &args.version, json_mode),
         ReleaseCommands::Create(args) => release_create(repo, args, json_mode),
         ReleaseCommands::Upload(args) => release_upload(repo, args, json_mode),
+        ReleaseCommands::Verify(args) => release_verify(repo, args, json_mode),
         ReleaseCommands::Publish(args) => release_publish(repo, args, json_mode),
     }
 }
@@ -1366,6 +1377,7 @@ fn release_view(repo: &RepoContext, version: &str, json_mode: bool) -> Result<Va
 }
 
 fn release_create(repo: &RepoContext, args: &ReleaseCreateArgs, json_mode: bool) -> Result<Value> {
+    ensure_assets_exist(&args.assets)?;
     let gh_args = release_create_args(
         &repo.config,
         &args.version,
@@ -1374,7 +1386,7 @@ fn release_create(repo: &RepoContext, args: &ReleaseCreateArgs, json_mode: bool)
         args.notes_file.as_ref(),
         args.live,
         args.prerelease,
-        &[],
+        &args.assets,
     )?;
     let command = command_vec(repo.config.tools.gh(), &gh_args);
     if args.dry_run {
@@ -1391,6 +1403,73 @@ fn release_create(repo: &RepoContext, args: &ReleaseCreateArgs, json_mode: bool)
         "tag": normalize_tag(&args.version),
         "draft": !args.live,
         "steps": [step],
+    }))
+}
+
+fn release_verify(repo: &RepoContext, args: &ReleaseVerifyArgs, json_mode: bool) -> Result<Value> {
+    let version = normalize_version_plain(&args.version);
+    let tag = normalize_tag(&version);
+    let assets = find_release_assets(repo, &version)?;
+    ensure_assets_exist(&assets)?;
+
+    let appcasts = appcast_paths(repo);
+    for appcast in &appcasts {
+        ensure_file_exists(appcast)?;
+    }
+
+    let mut steps = Vec::new();
+    let mut xmllint_args = vec!["--noout".to_string()];
+    xmllint_args.extend(appcasts.iter().map(path_string));
+    steps.push(run_step(
+        CmdSpec::new("verify appcasts", repo.config.tools.xmllint(), &repo.root).args(xmllint_args),
+        json_mode,
+    )?);
+
+    for asset in &assets {
+        steps.push(run_step(
+            CmdSpec::new("verify dmg", repo.config.tools.hdiutil(), &repo.root)
+                .args(["verify".to_string(), path_string(asset)]),
+            json_mode,
+        )?);
+    }
+
+    let gh_args = vec![
+        "release".to_string(),
+        "view".to_string(),
+        tag.clone(),
+        "--json".to_string(),
+        "tagName,name,isDraft,isPrerelease,url,assets".to_string(),
+    ];
+    let release_step = run_step_captured(
+        CmdSpec::new("gh release view", repo.config.tools.gh(), &repo.root).args(gh_args),
+    )?;
+    let release = serde_json::from_str::<Value>(&release_step.stdout)
+        .context("failed to parse release JSON")?;
+    steps.push(release_step);
+
+    if release["tagName"].as_str() != Some(tag.as_str()) {
+        bail!(
+            "GitHub release tag mismatch: expected {}, got {}",
+            tag,
+            release["tagName"].as_str().unwrap_or("<missing>")
+        );
+    }
+
+    let asset_checks = verify_release_asset_metadata(&assets, &release)?;
+
+    if !json_mode {
+        println!("Release {} verified.", tag);
+    }
+
+    Ok(json!({
+        "ok": true,
+        "action": "repo release verify",
+        "repo": repo.root,
+        "tag": tag,
+        "appcasts": appcasts,
+        "assets": asset_checks,
+        "release": release,
+        "steps": steps,
     }))
 }
 
@@ -1729,6 +1808,39 @@ fn run_step(spec: CmdSpec, json_mode: bool) -> Result<StepReport> {
     }
 }
 
+fn run_step_captured(spec: CmdSpec) -> Result<StepReport> {
+    let verbose = VERBOSE.load(Ordering::Relaxed);
+    let command = spec.command_vec();
+    if verbose {
+        eprintln!("[age-mac] start: {}", spec.name);
+        eprintln!("[age-mac] cwd: {}", spec.cwd.display());
+        eprintln!("[age-mac] cmd: {}", shell_join(&command));
+    }
+    let started = Instant::now();
+    let output = spec
+        .command()
+        .output()
+        .with_context(|| format!("failed to run {}", spec.name))?;
+    let status = output.status.code().unwrap_or(-1);
+    let ok = output.status.success();
+    if verbose {
+        print_step_finish(&spec.name, ok, status, started.elapsed().as_secs_f64());
+    }
+    let report = StepReport {
+        name: spec.name.clone(),
+        command,
+        cwd: path_string(&spec.cwd),
+        status,
+        ok,
+        stdout: truncate_output(String::from_utf8_lossy(&output.stdout).to_string()),
+        stderr: truncate_output(String::from_utf8_lossy(&output.stderr).to_string()),
+    };
+    if !report.ok {
+        bail!("{} failed with status {}", spec.name, status);
+    }
+    Ok(report)
+}
+
 fn print_step_finish(name: &str, ok: bool, status: i32, elapsed_secs: f64) {
     let state = if ok { "ok" } else { "failed" };
     eprintln!(
@@ -1926,6 +2038,14 @@ fn release_dir_path(repo: &RepoContext) -> PathBuf {
     resolve_repo_path(&repo.root, repo.config.paths.release_dir())
 }
 
+fn appcast_paths(repo: &RepoContext) -> [PathBuf; 3] {
+    [
+        repo.root.join("pages/appcast.xml"),
+        repo.root.join("pages/appcast-arm64.xml"),
+        repo.root.join("pages/appcast-x86_64.xml"),
+    ]
+}
+
 fn app_bundle_path(repo: &RepoContext) -> PathBuf {
     resolve_repo_path(&repo.root, repo.config.paths.app_bundle())
 }
@@ -2048,6 +2168,56 @@ fn release_create_args(
         args.push("--prerelease".to_string());
     }
     Ok(args)
+}
+
+fn verify_release_asset_metadata(local_assets: &[PathBuf], release: &Value) -> Result<Vec<Value>> {
+    let remote_assets = release["assets"]
+        .as_array()
+        .context("release JSON is missing assets array")?;
+    let mut checks = Vec::new();
+
+    for local_asset in local_assets {
+        let name = local_asset
+            .file_name()
+            .and_then(OsStr::to_str)
+            .context("release asset path is missing a file name")?;
+        let local_size = fs::metadata(local_asset)
+            .with_context(|| format!("failed to read metadata for {}", local_asset.display()))?
+            .len();
+        let remote = remote_assets
+            .iter()
+            .find(|asset| asset["name"].as_str() == Some(name))
+            .with_context(|| format!("GitHub release asset is missing: {}", name))?;
+        let remote_size = remote["size"]
+            .as_u64()
+            .with_context(|| format!("GitHub release asset {} is missing size", name))?;
+        let state = remote["state"].as_str().unwrap_or("unknown");
+
+        if state != "uploaded" {
+            bail!("GitHub release asset {} is not uploaded: {}", name, state);
+        }
+        if remote_size != local_size {
+            bail!(
+                "GitHub release asset {} size mismatch: local {}, remote {}",
+                name,
+                local_size,
+                remote_size
+            );
+        }
+
+        checks.push(json!({
+            "ok": true,
+            "name": name,
+            "local_path": local_asset,
+            "local_size": local_size,
+            "remote_size": remote_size,
+            "state": state,
+            "url": remote["url"],
+            "digest": remote["digest"],
+        }));
+    }
+
+    Ok(checks)
 }
 
 fn dry_run_value(
@@ -2227,6 +2397,118 @@ mod tests {
         assert_eq!(args[0], "release");
         assert_eq!(args[1], "create");
         assert_eq!(args[2], "v1.3.2");
+    }
+
+    #[test]
+    fn parses_release_create_assets() {
+        let cli = Cli::try_parse_from([
+            "age-mac",
+            "repo",
+            "release",
+            "create",
+            "--version",
+            "1.3.2",
+            "--asset",
+            "pages/releases/AgeMac-1.3.2-arm64.dmg",
+            "--asset",
+            "pages/releases/AgeMac-1.3.2-universal.dmg",
+            "--live",
+        ])
+        .unwrap();
+
+        let Commands::Repo {
+            command:
+                RepoCommands::Release {
+                    command: ReleaseCommands::Create(args),
+                },
+        } = cli.command
+        else {
+            panic!("expected repo release create command");
+        };
+
+        assert_eq!(args.version, "1.3.2");
+        assert_eq!(
+            args.assets,
+            vec![
+                PathBuf::from("pages/releases/AgeMac-1.3.2-arm64.dmg"),
+                PathBuf::from("pages/releases/AgeMac-1.3.2-universal.dmg"),
+            ]
+        );
+        assert!(args.live);
+    }
+
+    #[test]
+    fn builds_release_create_args_with_assets() {
+        let args = release_create_args(
+            &Config::default(),
+            "1.3.2",
+            Some("Age Mac 1.3.2"),
+            Some("Release notes"),
+            None,
+            true,
+            false,
+            &[
+                PathBuf::from("pages/releases/AgeMac-1.3.2-arm64.dmg"),
+                PathBuf::from("pages/releases/AgeMac-1.3.2-universal.dmg"),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            &args[..5],
+            [
+                "release",
+                "create",
+                "v1.3.2",
+                "pages/releases/AgeMac-1.3.2-arm64.dmg",
+                "pages/releases/AgeMac-1.3.2-universal.dmg",
+            ]
+        );
+        assert!(!args.contains(&"--draft".to_string()));
+    }
+
+    #[test]
+    fn verifies_release_asset_metadata_by_name_state_and_size() {
+        let temp = create_temp_dir("age-mac-cli-release-test").unwrap();
+        let arm64 = temp.join("AgeMac-1.3.2-arm64.dmg");
+        let universal = temp.join("AgeMac-1.3.2-universal.dmg");
+        fs::write(&arm64, b"arm64").unwrap();
+        fs::write(&universal, b"universal").unwrap();
+
+        let release = json!({
+            "assets": [
+                {"name": "AgeMac-1.3.2-arm64.dmg", "state": "uploaded", "size": 5},
+                {"name": "AgeMac-1.3.2-universal.dmg", "state": "uploaded", "size": 9}
+            ]
+        });
+
+        let checks = verify_release_asset_metadata(&[arm64, universal], &release).unwrap();
+
+        assert_eq!(checks.len(), 2);
+        assert!(checks.iter().all(|check| check["ok"] == true));
+
+        fs::remove_dir_all(temp).unwrap();
+    }
+
+    #[test]
+    fn release_asset_metadata_rejects_size_mismatch() {
+        let temp = create_temp_dir("age-mac-cli-release-test").unwrap();
+        let arm64 = temp.join("AgeMac-1.3.2-arm64.dmg");
+        fs::write(&arm64, b"arm64").unwrap();
+
+        let release = json!({
+            "assets": [
+                {"name": "AgeMac-1.3.2-arm64.dmg", "state": "uploaded", "size": 999}
+            ]
+        });
+
+        let error = verify_release_asset_metadata(&[arm64], &release).unwrap_err();
+        assert!(
+            format!("{:#}", error).contains("size mismatch"),
+            "unexpected error: {error:#}"
+        );
+
+        fs::remove_dir_all(temp).unwrap();
     }
 
     #[test]
