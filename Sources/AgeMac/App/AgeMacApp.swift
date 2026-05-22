@@ -45,10 +45,20 @@ struct AgeMacApp: App {
         }
         .defaultSize(width: 1180, height: 760)
         .commands {
+            SidebarCommands()
+
             CommandGroup(replacing: .appInfo) {
                 Button(strings.aboutAgeMac) {
                     openWindow(id: "about")
                 }
+            }
+
+            CommandGroup(after: .sidebar) {
+                Button(strings.showAllAgeTabs) {
+                    showAllAgeTabs()
+                }
+                .disabled(!canShowAllAgeTabs)
+                .keyboardShortcut("\\", modifiers: [.command, .shift])
             }
 
             CommandGroup(replacing: .newItem) {
@@ -118,6 +128,19 @@ struct AgeMacApp: App {
                 .environmentObject(updateService)
         }
         .windowResizability(.contentSize)
+    }
+
+    private var canShowAllAgeTabs: Bool {
+        guard let window = NSApp.keyWindow else { return false }
+        return window.tabbingIdentifier == Self.mainWindowTabbingIdentifier
+    }
+
+    private func showAllAgeTabs() {
+        guard let window = NSApp.keyWindow,
+              window.tabbingIdentifier == Self.mainWindowTabbingIdentifier else {
+            return
+        }
+        window.toggleTabOverview(nil)
     }
 
     private func openMainWindowAsTab() {

@@ -75,6 +75,7 @@ struct AppStrings {
     var savedPublicKeys: String { text(en: "Saved public keys", zh: "已保存公钥") }
     var scanFolder: String { text(en: "Scan Folder", zh: "扫描文件夹") }
     var settingsLanguageSubtitle: String { text(en: "Interface language", zh: "界面语言") }
+    var showAllAgeTabs: String { text(en: "Show All Age Tabs", zh: "显示所有 Age 标签页") }
     var startDecrypt: String { text(en: "Start Decrypting", zh: "开始解密") }
     var startEncrypt: String { text(en: "Start Encrypting", zh: "开始加密") }
     var task: String { text(en: "Task", zh: "任务") }
