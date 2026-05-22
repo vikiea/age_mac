@@ -21,7 +21,7 @@ struct ContentView: View {
 
             NavigationSplitView {
                 SidebarView(selection: $workspace.selectedSection)
-                    .navigationSplitViewColumnWidth(min: 330, ideal: 360, max: 430)
+                    .navigationSplitViewColumnWidth(min: 230, ideal: 260, max: 330)
             } detail: {
                 DetailScrollContainer {
                     switch workspace.selectedSection ?? .encrypt {
@@ -44,15 +44,18 @@ struct ContentView: View {
         }
         .gaussianWindowTranslucency(enabled: store.settings.gaussianTransparencyEnabled)
         .windowAppearance(store.settings.appearance)
-        .alert("Age Mac", isPresented: Binding(
-            get: { store.alertMessage != nil || workspace.alertMessage != nil },
-            set: {
-                if !$0 {
-                    store.alertMessage = nil
-                    workspace.alertMessage = nil
+        .alert(
+            "Age Mac",
+            isPresented: Binding(
+                get: { store.alertMessage != nil || workspace.alertMessage != nil },
+                set: {
+                    if !$0 {
+                        store.alertMessage = nil
+                        workspace.alertMessage = nil
+                    }
                 }
-            }
-        )) {
+            )
+        ) {
             Button(store.strings.ok) {
                 store.alertMessage = nil
                 workspace.alertMessage = nil
@@ -87,7 +90,9 @@ private struct DetailScrollContainer<Content: View>: View {
         }
     }
 
-    private func edgePadding(for width: CGFloat) -> (horizontal: CGFloat, top: CGFloat, bottom: CGFloat) {
+    private func edgePadding(for width: CGFloat) -> (
+        horizontal: CGFloat, top: CGFloat, bottom: CGFloat
+    ) {
         let horizontal = min(max(width * 0.024, 20), 36)
         let top = min(max(width * 0.018, 22), 30)
         let bottom = min(max(width * 0.028, 30), 44)
@@ -126,9 +131,17 @@ struct DetailBackground: View {
     private var themeTint: LinearGradient {
         LinearGradient(
             colors: [
-                gaussianTransparencyEnabled ? Color.white.opacity(gaussianOverlayOpacity(base: colorScheme == .dark ? 0.08 : 0.18)) : .clear,
-                theme.accentColor.opacity(gaussianTransparencyEnabled ? gaussianOverlayOpacity(base: colorScheme == .dark ? 0.16 : 0.13) : themeOpacity),
-                theme.secondaryColor.opacity(gaussianTransparencyEnabled ? gaussianOverlayOpacity(base: colorScheme == .dark ? 0.14 : 0.11) : themeOpacity)
+                gaussianTransparencyEnabled
+                    ? Color.white.opacity(
+                        gaussianOverlayOpacity(base: colorScheme == .dark ? 0.08 : 0.18)) : .clear,
+                theme.accentColor.opacity(
+                    gaussianTransparencyEnabled
+                        ? gaussianOverlayOpacity(base: colorScheme == .dark ? 0.16 : 0.13)
+                        : themeOpacity),
+                theme.secondaryColor.opacity(
+                    gaussianTransparencyEnabled
+                        ? gaussianOverlayOpacity(base: colorScheme == .dark ? 0.14 : 0.11)
+                        : themeOpacity),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -351,7 +364,7 @@ struct SidebarView: View {
         LinearGradient(
             colors: [
                 store.settings.theme.accentColor.opacity(selectionOpacity),
-                store.settings.theme.secondaryColor.opacity(selectionOpacity * 0.86)
+                store.settings.theme.secondaryColor.opacity(selectionOpacity * 0.86),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -383,8 +396,8 @@ private struct SidebarSelectionHighlightDisabler: NSViewRepresentable {
     }
 }
 
-private extension NSView {
-    func disableEnclosingTableSelectionHighlight() {
+extension NSView {
+    fileprivate func disableEnclosingTableSelectionHighlight() {
         var candidate: NSView? = self
         while let view = candidate {
             if let tableView = view as? NSTableView {
@@ -399,7 +412,7 @@ private extension NSView {
         }
     }
 
-    func firstDescendant<T: NSView>(of type: T.Type) -> T? {
+    fileprivate func firstDescendant<T: NSView>(of type: T.Type) -> T? {
         for subview in subviews {
             if let match = subview as? T {
                 return match

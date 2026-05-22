@@ -182,6 +182,74 @@ func TestEncryptBatchKeyPairRoundTrip(t *testing.T) {
 	}
 }
 
+func TestEncryptBatchPreservesRelativeArchivePaths(t *testing.T) {
+	tempDir := t.TempDir()
+	inputDir := filepath.Join(tempDir, "input")
+	outputDir := filepath.Join(tempDir, "output")
+	nestedDir := filepath.Join(inputDir, "folder", "child")
+	if err := os.MkdirAll(nestedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	rootFile := filepath.Join(inputDir, "root.txt")
+	nestedFile := filepath.Join(nestedDir, "note.txt")
+	if err := os.WriteFile(rootFile, []byte("root file\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nestedFile, []byte("nested file\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	filesJSON := writeTestFilesJSON(t, tempDir, []fileSpec{
+		{Path: rootFile, Name: "root.txt"},
+		{Path: nestedFile, Name: "folder/child/note.txt"},
+	})
+	secretFile := filepath.Join(tempDir, "secret.txt")
+	if err := os.WriteFile(secretFile, []byte("test-passphrase"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := encryptBatch([]string{
+		"--files-json", filesJSON,
+		"--output-dir", outputDir,
+		"--output-name", "nested.tar.age",
+		"--auth", "passphrase",
+		"--secret-file", secretFile,
+		"--duplicate", "overwrite",
+	}); err != nil {
+		t.Fatalf("encryptBatch returned error: %v", err)
+	}
+
+	encryptedPath := filepath.Join(outputDir, "encrypted", "nested.tar.age")
+	encryptedFilesJSON := writeTestFilesJSON(t, tempDir, []fileSpec{{Path: encryptedPath, Name: "nested.tar.age"}})
+	if err := decryptFiles([]string{
+		"--files-json", encryptedFilesJSON,
+		"--output-dir", outputDir,
+		"--auth", "passphrase",
+		"--secret-file", secretFile,
+		"--duplicate", "overwrite",
+	}); err != nil {
+		t.Fatalf("decryptFiles returned error: %v", err)
+	}
+
+	decryptedRoot, err := os.ReadFile(filepath.Join(outputDir, "decrypted", "root.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(decryptedRoot) != "root file\n" {
+		t.Fatalf("root decrypted content mismatch: %q", string(decryptedRoot))
+	}
+	decryptedNested, err := os.ReadFile(filepath.Join(outputDir, "decrypted", "folder", "child", "note.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(decryptedNested) != "nested file\n" {
+		t.Fatalf("nested decrypted content mismatch: %q", string(decryptedNested))
+	}
+	if _, err := os.Stat(filepath.Join(outputDir, "decrypted", "note.txt")); !os.IsNotExist(err) {
+		t.Fatalf("nested file should not be flattened, stat err=%v", err)
+	}
+}
+
 func TestSeparateEncryptAndDecryptHonorConcurrency(t *testing.T) {
 	tempDir := t.TempDir()
 	inputDir := filepath.Join(tempDir, "input")
@@ -243,6 +311,46 @@ func TestSeparateEncryptAndDecryptHonorConcurrency(t *testing.T) {
 		if string(decrypted) != expected {
 			t.Fatalf("%s decrypted content mismatch: %q", file.Name, string(decrypted))
 		}
+	}
+}
+
+func TestEncryptSeparatePreservesRelativeOutputFolders(t *testing.T) {
+	tempDir := t.TempDir()
+	inputDir := filepath.Join(tempDir, "input")
+	outputDir := filepath.Join(tempDir, "output")
+	nestedDir := filepath.Join(inputDir, "folder", "child")
+	if err := os.MkdirAll(nestedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	nestedFile := filepath.Join(nestedDir, "note.txt")
+	if err := os.WriteFile(nestedFile, []byte("nested separate payload\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	filesJSON := writeTestFilesJSON(t, tempDir, []fileSpec{
+		{Path: nestedFile, Name: "folder/child/note.txt"},
+	})
+	secretFile := filepath.Join(tempDir, "secret.txt")
+	if err := os.WriteFile(secretFile, []byte("test-passphrase"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := encryptSeparate([]string{
+		"--files-json", filesJSON,
+		"--output-dir", outputDir,
+		"--auth", "passphrase",
+		"--secret-file", secretFile,
+		"--duplicate", "overwrite",
+	}); err != nil {
+		t.Fatalf("encryptSeparate returned error: %v", err)
+	}
+
+	nestedOutput := filepath.Join(outputDir, "encrypted", "folder", "child", "note.tar.age")
+	if _, err := os.Stat(nestedOutput); err != nil {
+		t.Fatalf("expected separate output to preserve relative folders: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outputDir, "encrypted", "note.tar.age")); !os.IsNotExist(err) {
+		t.Fatalf("separate output should not be flattened, stat err=%v", err)
 	}
 }
 

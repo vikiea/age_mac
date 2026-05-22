@@ -5,6 +5,7 @@
 .build/
 .swiftpm/
 dist/
+Tools/age-mac-cli/target/
 Engine/age-engine
 .DS_Store
 *.tmp

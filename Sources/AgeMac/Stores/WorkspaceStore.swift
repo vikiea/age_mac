@@ -73,7 +73,7 @@ final class WorkspaceStore: ObservableObject {
 
     func chooseEncryptFolder() {
         guard let folder = FilePanelService.chooseFolder() else { return }
-        addEncryptFiles(FilePanelService.filesInFolder(folder))
+        addEncryptFolder(folder)
     }
 
     func chooseDecryptFiles() {
@@ -82,8 +82,7 @@ final class WorkspaceStore: ObservableObject {
 
     func chooseDecryptFolder() {
         guard let folder = FilePanelService.chooseFolder() else { return }
-        let files = FilePanelService.filesInFolder(folder).filter { $0.pathExtension.lowercased() == "age" }
-        addDecryptFiles(files)
+        addDecryptFolder(folder)
     }
 
     func addEncryptFiles(_ urls: [URL]) {
@@ -92,6 +91,18 @@ final class WorkspaceStore: ObservableObject {
 
     func addDecryptFiles(_ urls: [URL]) {
         merge(urls: urls, into: &decryptFiles)
+    }
+
+    func addEncryptFolder(_ folder: URL) {
+        merge(folder: folder, into: &encryptFiles)
+    }
+
+    func addDecryptFolder(_ folder: URL) {
+        merge(
+            folder: folder,
+            into: &decryptFiles,
+            shouldInclude: { $0.pathExtension.lowercased() == "age" }
+        )
     }
 
     func removeEncryptFile(_ file: SelectedFile) {
@@ -387,6 +398,30 @@ final class WorkspaceStore: ObservableObject {
             .filter { !existing.contains($0.path) }
             .map(SelectedFile.init(url:))
         files.append(contentsOf: additions)
+    }
+
+    private func merge(
+        folder: URL,
+        into files: inout [SelectedFile],
+        shouldInclude: (URL) -> Bool = { _ in true }
+    ) {
+        let folderPath = folder.standardizedFileURL.path
+        let existing = Set(files.map(\.path))
+        let additions = FilePanelService.filesInFolder(folder)
+            .filter(shouldInclude)
+            .filter { !existing.contains($0.path) }
+            .compactMap { url -> SelectedFile? in
+                guard let name = relativeName(for: url, in: folderPath) else { return nil }
+                return SelectedFile(url: url, name: name)
+            }
+        files.append(contentsOf: additions)
+    }
+
+    private func relativeName(for url: URL, in folderPath: String) -> String? {
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(folderPath + "/") else { return nil }
+        let relative = String(path.dropFirst(folderPath.count + 1))
+        return relative.isEmpty ? nil : relative
     }
 
     private func computedArchiveName(compress: Bool) -> String {

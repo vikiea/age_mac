@@ -1,6 +1,6 @@
 ---
 name: age-mac-development
-description: Develop, build, run, debug, or extend the Age Mac standalone macOS app. Use when working in /Users/qinfuling/www/github/person/age_mac, changing SwiftUI UI, the Go age engine, long-running task execution, key/history/settings persistence, Liquid Glass styling, or project verification.
+description: Develop, build, run, debug, or extend the Age Mac standalone macOS app. Use when working in /Users/qinfuling/www/github/vikiea/age_mac, changing SwiftUI UI, the Go age engine, long-running task execution, key/history/settings persistence, Liquid Glass styling, or project verification.
 ---
 
 <!--
@@ -43,7 +43,7 @@ Use this skill for the standalone `age_mac` project. Do not edit the sibling `ag
 
 ## Build And Run
 
-From `/Users/qinfuling/www/github/person/age_mac`:
+From `/Users/qinfuling/www/github/vikiea/age_mac`:
 
 ```bash
 swift build

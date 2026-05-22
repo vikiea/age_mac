@@ -68,6 +68,15 @@ Run the app:
 
 The script builds the Go engine, builds the SwiftPM executable, stages `dist/AgeMac.app`, embeds resources and Sparkle, signs locally, registers the bundle, and launches it.
 
+For repeatable Codex and terminal workflows, install the project CLI:
+
+```bash
+(cd Tools/age-mac-cli && make install-local)
+age-mac --json doctor
+```
+
+The CLI wraps build, run, debug, verification, packaging, PR, and GitHub Release actions from any working directory. See [Tools/age-mac-cli/README.md](Tools/age-mac-cli/README.md).
+
 ## Verify
 
 ```bash

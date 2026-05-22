@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_NAME="AgeMac"
 BUNDLE_ID="com.vikiea.age-mac"
 MIN_SYSTEM_VERSION="14.0"
-BUNDLE_VERSION="${BUNDLE_VERSION:-1.3.1}"
+BUNDLE_VERSION="${BUNDLE_VERSION:-1.3.2}"
 SPARKLE_PUBLIC_ED_KEY="IGjw2mVnG2Q/TyUK14//dlR7yeJMYS2Fzx4mRa1ZBuA="
 PROJECT_LINK="https://vikiea.github.io/age_mac/"
 RELEASE_BASE_URL="https://github.com/vikiea/age_mac/releases/download/v$BUNDLE_VERSION"
@@ -342,6 +342,27 @@ verify_dmg() {
   rm -rf "$mount_point"
 }
 
+log_step() {
+  printf '[release] %s\n' "$*" >&2
+}
+
+build_selected_arch() {
+  local arch="$1"
+  local build_dir
+  local app_bundle
+  local dmg_path
+
+  log_step "start $arch"
+  build_dir="$(swift_build_path_for "$arch")"
+  log_step "$arch swift build: $build_dir"
+  app_bundle="$(stage_app_for "$arch" "$build_dir")"
+  log_step "$arch app: $app_bundle"
+  dmg_path="$(create_dmg_for "$arch" "$app_bundle")"
+  log_step "$arch dmg: $dmg_path"
+  verify_dmg "$arch" "$dmg_path"
+  log_step "finish $arch"
+}
+
 main() {
   local target="${1:-all}"
   local selected=()
@@ -359,20 +380,28 @@ main() {
   local x86_dmg=""
   local universal_dmg=""
 
-  for arch in "${selected[@]}"; do
-    local build_dir
-    local app_bundle
-    local dmg_path
-    build_dir="$(swift_build_path_for "$arch")"
-    app_bundle="$(stage_app_for "$arch" "$build_dir")"
-    dmg_path="$(create_dmg_for "$arch" "$app_bundle")"
-    verify_dmg "$arch" "$dmg_path"
-    case "$arch" in
-      arm64) arm64_dmg="$dmg_path" ;;
-      x86_64) x86_dmg="$dmg_path" ;;
-      universal) universal_dmg="$dmg_path" ;;
-    esac
-  done
+  if [[ "$target" == "all" ]]; then
+    log_step "building arm64 and x86_64 in parallel"
+    build_selected_arch arm64 &
+    local arm64_pid=$!
+    build_selected_arch x86_64 &
+    local x86_pid=$!
+    wait "$arm64_pid"
+    wait "$x86_pid"
+    build_selected_arch universal
+    arm64_dmg="$RELEASE_DIR/$APP_NAME-$BUNDLE_VERSION-arm64.dmg"
+    x86_dmg="$RELEASE_DIR/$APP_NAME-$BUNDLE_VERSION-x86_64.dmg"
+    universal_dmg="$RELEASE_DIR/$APP_NAME-$BUNDLE_VERSION-universal.dmg"
+  else
+    for arch in "${selected[@]}"; do
+      build_selected_arch "$arch"
+      case "$arch" in
+        arm64) arm64_dmg="$RELEASE_DIR/$APP_NAME-$BUNDLE_VERSION-arm64.dmg" ;;
+        x86_64) x86_dmg="$RELEASE_DIR/$APP_NAME-$BUNDLE_VERSION-x86_64.dmg" ;;
+        universal) universal_dmg="$RELEASE_DIR/$APP_NAME-$BUNDLE_VERSION-universal.dmg" ;;
+      esac
+    done
+  fi
 
   if [[ "$target" == "all" ]]; then
     local arm64_signature

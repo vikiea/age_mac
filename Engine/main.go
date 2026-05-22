@@ -182,15 +182,12 @@ func encryptSeparate(args []string) error {
 	}
 
 	results := runFileWorkers(files, clampConcurrency(*concurrency), func(index int, file fileSpec) operationResult {
-		base := strings.TrimSuffix(file.Name, filepath.Ext(file.Name))
-		if base == "" {
-			base = file.Name
-		}
+		base := archiveEntryStem(file.Name)
 		extension := ".tar.age"
 		if *compress {
 			extension = ".tar.gz.age"
 		}
-		outPath, err := outputPath(root, base+extension, *duplicate)
+		outPath, err := safeOutputPath(root, base+extension, *duplicate)
 		if err != nil {
 			return operationResult{index: index, name: file.Name, err: err}
 		}
@@ -490,7 +487,7 @@ func addFileToTar(tw *tar.Writer, file fileSpec) error {
 	if err != nil {
 		return err
 	}
-	header.Name = filepath.Base(file.Name)
+	header.Name = archiveEntryName(file.Name)
 	if err := tw.WriteHeader(header); err != nil {
 		return err
 	}
@@ -501,6 +498,24 @@ func addFileToTar(tw *tar.Writer, file fileSpec) error {
 	defer in.Close()
 	_, err = io.Copy(tw, in)
 	return err
+}
+
+func archiveEntryName(name string) string {
+	cleanPath := filepath.Clean(name)
+	if filepath.IsAbs(cleanPath) || cleanPath == "." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) || cleanPath == ".." {
+		return filepath.Base(name)
+	}
+	return filepath.ToSlash(cleanPath)
+}
+
+func archiveEntryStem(name string) string {
+	entryName := archiveEntryName(name)
+	extension := filepath.Ext(entryName)
+	base := strings.TrimSuffix(entryName, extension)
+	if base == "" {
+		return entryName
+	}
+	return base
 }
 
 type operationResult struct {

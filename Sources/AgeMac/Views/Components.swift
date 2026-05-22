@@ -94,32 +94,119 @@ struct FileListView: View {
             ContentUnavailableView(store.strings.noFilesTitle, systemImage: "doc.badge.plus", description: Text(store.strings.noFilesDescription))
                 .frame(maxWidth: .infinity, minHeight: 180)
         } else {
-            List(files) { file in
-                HStack(spacing: 10) {
-                    Image(systemName: "doc")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 18)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(file.name)
-                            .lineLimit(1)
-                        Text("\(AppFormatters.fileSize(file.size, language: store.settings.language)) · \(AppFormatters.shortPath(file.path))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+            List {
+                ForEach(FileHierarchyRow.rows(for: files)) { row in
+                    switch row.kind {
+                    case .folder(let name):
+                        FolderHierarchyRow(name: name, depth: row.depth)
+                    case .file(let file):
+                        FileHierarchyFileRow(file: file, depth: row.depth, onRemove: onRemove)
+                            .environmentObject(store)
                     }
-                    Spacer()
-                    Button {
-                        onRemove(file)
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(.borderless)
-                    .help(store.strings.remove())
                 }
-                .padding(.vertical, 3)
             }
             .frame(minHeight: 180)
         }
+    }
+}
+
+private struct FileHierarchyRow: Identifiable {
+    enum Kind {
+        case folder(name: String)
+        case file(SelectedFile)
+    }
+
+    var id: String
+    var depth: Int
+    var kind: Kind
+
+    static func rows(for files: [SelectedFile]) -> [FileHierarchyRow] {
+        var rows: [FileHierarchyRow] = []
+        var emittedFolders = Set<String>()
+        let sortedFiles = files.sorted { lhs, rhs in
+            lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+
+        for file in sortedFiles {
+            let components = file.name
+                .split(separator: "/", omittingEmptySubsequences: true)
+                .map(String.init)
+
+            guard components.count > 1 else {
+                rows.append(FileHierarchyRow(id: "file-\(file.id)", depth: 0, kind: .file(file)))
+                continue
+            }
+
+            var folderPath = ""
+            for (index, component) in components.dropLast().enumerated() {
+                folderPath = folderPath.isEmpty ? component : "\(folderPath)/\(component)"
+                guard emittedFolders.insert(folderPath).inserted else { continue }
+                rows.append(FileHierarchyRow(id: "folder-\(folderPath)", depth: index, kind: .folder(name: component)))
+            }
+
+            rows.append(FileHierarchyRow(id: "file-\(file.id)", depth: components.count - 1, kind: .file(file)))
+        }
+
+        return rows
+    }
+}
+
+private struct FolderHierarchyRow: View {
+    var name: String
+    var depth: Int
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Spacer()
+                .frame(width: CGFloat(depth) * 18)
+            Image(systemName: "folder")
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            Text(name)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+private struct FileHierarchyFileRow: View {
+    @EnvironmentObject private var store: AppStore
+    var file: SelectedFile
+    var depth: Int
+    var onRemove: (SelectedFile) -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Spacer()
+                .frame(width: CGFloat(depth) * 18)
+            Image(systemName: "doc")
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayName)
+                    .lineLimit(1)
+                Text("\(AppFormatters.fileSize(file.size, language: store.settings.language)) · \(AppFormatters.shortPath(file.path))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button {
+                onRemove(file)
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help(store.strings.remove())
+        }
+        .padding(.vertical, 3)
+    }
+
+    private var displayName: String {
+        file.name.split(separator: "/", omittingEmptySubsequences: true).last.map(String.init) ?? file.name
     }
 }
 
@@ -220,8 +307,14 @@ private struct OutputFilesList: View {
 
             ScrollView {
                 LazyVStack(spacing: 6) {
-                    ForEach(outputs, id: \.self) { output in
-                        OutputFileRow(path: output)
+                    ForEach(OutputHierarchyRow.rows(for: outputs)) { row in
+                        switch row.kind {
+                        case .folder(let name):
+                            OutputFolderRow(name: name, depth: row.depth)
+                        case .file(let path):
+                            OutputFileRow(path: path, depth: row.depth)
+                                .environmentObject(store)
+                        }
                     }
                 }
                 .padding(2)
@@ -231,16 +324,130 @@ private struct OutputFilesList: View {
     }
 }
 
+private struct OutputHierarchyRow: Identifiable {
+    enum Kind {
+        case folder(name: String)
+        case file(path: String)
+    }
+
+    var id: String
+    var depth: Int
+    var kind: Kind
+
+    static func rows(for outputs: [String]) -> [OutputHierarchyRow] {
+        let sortedOutputs = outputs.sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
+        let root = commonOutputRoot(for: sortedOutputs)
+        var rows: [OutputHierarchyRow] = []
+        var emittedFolders = Set<String>()
+
+        for path in sortedOutputs {
+            let components = relativeComponents(for: path, root: root)
+            guard components.count > 1 else {
+                rows.append(OutputHierarchyRow(id: "file-\(path)", depth: 0, kind: .file(path: path)))
+                continue
+            }
+
+            var folderPath = ""
+            for (index, component) in components.dropLast().enumerated() {
+                folderPath = folderPath.isEmpty ? component : "\(folderPath)/\(component)"
+                guard emittedFolders.insert(folderPath).inserted else { continue }
+                rows.append(OutputHierarchyRow(id: "folder-\(folderPath)", depth: index, kind: .folder(name: component)))
+            }
+
+            rows.append(OutputHierarchyRow(id: "file-\(path)", depth: components.count - 1, kind: .file(path: path)))
+        }
+
+        return rows
+    }
+
+    private static func commonOutputRoot(for outputs: [String]) -> String? {
+        let operationRoot = sharedOperationRoot(for: outputs)
+        if let operationRoot {
+            return operationRoot
+        }
+
+        let parentComponents = outputs.map {
+            URL(fileURLWithPath: $0)
+                .deletingLastPathComponent()
+                .standardizedFileURL
+                .pathComponents
+        }
+        guard var common = parentComponents.first, !common.isEmpty else { return nil }
+        for components in parentComponents.dropFirst() {
+            common = Array(zip(common, components).prefix { $0 == $1 }.map(\.0))
+        }
+        guard !common.isEmpty else { return nil }
+        return NSURL.fileURL(withPathComponents: common)?.path
+    }
+
+    private static func sharedOperationRoot(for outputs: [String]) -> String? {
+        var roots: [String] = []
+        for output in outputs {
+            let url = URL(fileURLWithPath: output).standardizedFileURL
+            let components = url.pathComponents
+            guard let markerIndex = components.lastIndex(where: { $0 == "encrypted" || $0 == "decrypted" }) else {
+                return nil
+            }
+            let rootComponents = Array(components.prefix(markerIndex + 1))
+            guard let root = NSURL.fileURL(withPathComponents: rootComponents)?.path else {
+                return nil
+            }
+            roots.append(root)
+        }
+        guard let first = roots.first, roots.allSatisfy({ $0 == first }) else { return nil }
+        return first
+    }
+
+    private static func relativeComponents(for path: String, root: String?) -> [String] {
+        let url = URL(fileURLWithPath: path).standardizedFileURL
+        guard let root, url.path.hasPrefix(root + "/") else {
+            return [url.lastPathComponent].filter { !$0.isEmpty }
+        }
+        let relative = String(url.path.dropFirst(root.count + 1))
+        let components = relative.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        return components.isEmpty ? [url.lastPathComponent] : components
+    }
+}
+
+private struct OutputFolderRow: View {
+    var name: String
+    var depth: Int
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Spacer()
+                .frame(width: CGFloat(depth) * 18)
+            Image(systemName: "folder")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+            Text(name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct OutputFileRow: View {
     @EnvironmentObject private var store: AppStore
     @State private var isHovering = false
     var path: String
+    var depth: Int
 
     var body: some View {
         Button {
             store.reveal(path: path)
         } label: {
             HStack(spacing: 10) {
+                Spacer()
+                    .frame(width: CGFloat(depth) * 18)
                 Image(systemName: fileIcon)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(store.settings.theme.accentColor)

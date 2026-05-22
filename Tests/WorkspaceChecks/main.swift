@@ -52,6 +52,30 @@ struct WorkspaceChecks {
         check(first.encryptPassphrase == "first-passphrase", "first workspace should keep its passphrase draft")
         check(second.decryptPassphrase == "second-passphrase", "second workspace should keep its passphrase draft")
 
+        let folder = supportURL.appendingPathComponent("folder-input", isDirectory: true)
+        let nested = folder.appendingPathComponent("child", isDirectory: true)
+        try? FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        let rootFile = folder.appendingPathComponent("root.txt")
+        let nestedFile = nested.appendingPathComponent("note.txt")
+        let nestedAgeFile = nested.appendingPathComponent("secret.age")
+        FileManager.default.createFile(atPath: rootFile.path, contents: Data())
+        FileManager.default.createFile(atPath: nestedFile.path, contents: Data())
+        FileManager.default.createFile(atPath: nestedAgeFile.path, contents: Data())
+
+        first.clearEncryptFiles()
+        first.addEncryptFolder(folder)
+        check(
+            Set(first.encryptFiles.map(\.name)) == Set(["root.txt", "child/note.txt", "child/secret.age"]),
+            "folder encryption should preserve relative child paths"
+        )
+
+        second.clearDecryptFiles()
+        second.addDecryptFolder(folder)
+        check(
+            second.decryptFiles.map(\.name) == ["child/secret.age"],
+            "folder decryption should preserve relative paths for scanned age files"
+        )
+
         second.addEncryptFiles([FileManager.default.temporaryDirectory.appendingPathComponent("second.txt")])
         first.currentTask = .started(id: UUID(), kind: .encrypt, title: "Encrypt A", phase: "Running", total: 1)
         check(first.currentTask != nil, "first workspace should have its task")

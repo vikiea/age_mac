@@ -249,6 +249,13 @@ struct SelectedFile: Identifiable, Codable, Hashable {
         self.size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
     }
 
+    init(url: URL, name: String) {
+        self.id = UUID()
+        self.path = url.path
+        self.name = name
+        self.size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+    }
+
     var url: URL { URL(fileURLWithPath: path) }
 }
 
