@@ -61,6 +61,15 @@ struct HistoryView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
 
+                        if let details = record.details {
+                            let items = details.summaryItems(in: store.settings.language)
+                            Text((items + [strings.inputFileCount(details.inputCount)]).joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .textSelection(.enabled)
+                        }
+
                         HStack {
                             Text(AppFormatters.dateTime(record.timestamp, language: store.settings.language))
                             Spacer()

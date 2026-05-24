@@ -24,6 +24,7 @@ Age Mac includes or depends on the following open-source components.
 
 ## Go extended libraries
 
+- Source: https://pkg.go.dev/filippo.io/hpke
 - Source: https://pkg.go.dev/golang.org/x/crypto
 - Source: https://pkg.go.dev/golang.org/x/sys
 - Purpose: supporting crypto and platform APIs used through the Go age dependency graph.

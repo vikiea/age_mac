@@ -126,6 +126,10 @@ struct AppStrings {
         text(en: "Imported \(count) keys from ~/.config/age", zh: "已从 ~/.config/age 导入 \(count) 个密钥")
     }
 
+    func inputFileCount(_ count: Int) -> String {
+        text(en: "\(count) inputs", zh: "\(count) 个输入")
+    }
+
     func importKeyFileFailed(_ error: String) -> String {
         text(en: "Failed to import key file: \(error)", zh: "导入密钥文件失败: \(error)")
     }

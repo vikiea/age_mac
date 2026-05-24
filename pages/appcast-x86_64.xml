@@ -11,13 +11,13 @@ See LICENSE for details.
         <description>Public update feed for Age Mac.</description>
         <language>zh-CN</language>
         <item>
-            <title>1.3.2 (x86_64)</title>
-            <pubDate>Fri, 22 May 2026 15:17:39 +0800</pubDate>
+            <title>1.4.0 (x86_64)</title>
+            <pubDate>Sun, 24 May 2026 11:50:08 +0800</pubDate>
             <link>https://vikiea.github.io/age_mac/</link>
-            <sparkle:version>1.3.2</sparkle:version>
-            <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
+            <sparkle:version>1.4.0</sparkle:version>
+            <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/vikiea/age_mac/releases/download/v1.3.2/AgeMac-1.3.2-x86_64.dmg" sparkle:edSignature="pwmwOHGJvuhblMR9/nF2pK5y8tE4oJuyMg2v+CAoftevKZyVimOGVpP5BuvJigDsWw0/XhtFPHq5H/BHwkQMDA==" length="5318148" type="application/octet-stream"/>
+            <enclosure url="https://github.com/vikiea/age_mac/releases/download/v1.4.0/AgeMac-1.4.0-x86_64.dmg" sparkle:edSignature="1Y9WivDmPAmTzwBwgLiaxKwU4ImvGOGUi3X7v/mvqR5M+ul3X2Xq0LDYwWWfyCMqgGy9sK6mLFuEDRk/23zxDA==" length="5559484" type="application/octet-stream"/>
         </item>
     </channel>
 </rss>

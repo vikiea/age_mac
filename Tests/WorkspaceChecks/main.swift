@@ -83,6 +83,85 @@ struct WorkspaceChecks {
         check(!first.canStartEncrypt, "running task should block only its workspace")
         check(second.canStartEncrypt, "another workspace should still be able to start")
 
+        let historySupportURL = supportURL.appendingPathComponent("history-metadata", isDirectory: true)
+        let historyStore = AppStore(persistence: AppPersistence(appSupportURL: historySupportURL))
+        historyStore.settings.outputDirectory = historySupportURL.appendingPathComponent("outputs", isDirectory: true).path
+        historyStore.settings.compressEnabled = true
+        historyStore.settings.duplicateStrategy = .overwrite
+        historyStore.settings.concurrency = 2
+
+        let historyWorkspace = WorkspaceStore(appStore: historyStore)
+        let source = historySupportURL.appendingPathComponent("source.txt")
+        try? FileManager.default.createDirectory(at: historySupportURL, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: source.path, contents: Data("hello".utf8))
+        historyWorkspace.addEncryptFiles([source])
+        historyWorkspace.encryptAuthMode = .passphrase
+        historyWorkspace.encryptPassphrase = "do-not-persist"
+        historyWorkspace.startEncrypt()
+
+        guard let record = historyStore.operations.first else {
+            check(false, "starting encryption should create a history record")
+            return
+        }
+        check(record.details?.authMethod == .passphrase, "history should record passphrase auth without the passphrase value")
+        check(record.details?.encryptionMode == .batchPack, "history should record encryption mode")
+        check(record.details?.compression == .enabled, "history should record compression setting")
+        check(record.details?.duplicateStrategy == .overwrite, "history should record duplicate strategy")
+        check(record.details?.concurrency == 2, "history should record concurrency")
+        check(record.details?.inputCount == 1, "history should record input count")
+        check(record.recipientInfo == AppStrings(language: .english).passphrase, "history should keep safe recipient label")
+        check(!String(data: try! JSONEncoder().encode(record), encoding: .utf8)!.contains("do-not-persist"), "history should not persist passphrases")
+
+        historyWorkspace.cancelCurrentTask()
+
+        let namedKey = KeyEntry(
+            id: UUID(),
+            name: "Laptop key",
+            publicKey: "age1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq",
+            privateKey: "AGE-SECRET-KEY-1QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ",
+            createdAt: Date(timeIntervalSince1970: 1)
+        )
+        historyStore.keys.insert(namedKey, at: 0)
+
+        let keyDecryptWorkspace = WorkspaceStore(appStore: historyStore)
+        keyDecryptWorkspace.addDecryptFiles([historySupportURL.appendingPathComponent("secret.age")])
+        keyDecryptWorkspace.decryptAuthMode = .key
+        keyDecryptWorkspace.selectedDecryptKeyID = namedKey.id
+        keyDecryptWorkspace.startDecrypt()
+
+        guard let decryptRecord = historyStore.operations.first else {
+            check(false, "starting key decryption should create a history record")
+            return
+        }
+        check(decryptRecord.details?.authMethod == .privateKey, "history should record private key auth")
+        check(decryptRecord.details?.keyHint?.name == "Laptop key", "history should prefer saved key name")
+        check(decryptRecord.details?.keyHint?.publicKeyPreview?.hasPrefix("age1qqqq") == true, "history should keep public key preview for saved private key")
+        let decryptJSON = String(data: try! JSONEncoder().encode(decryptRecord), encoding: .utf8)!
+        check(!decryptJSON.contains("AGE-SECRET-KEY"), "history should not persist private key material")
+        check(!decryptJSON.contains(namedKey.publicKey), "history should not persist full public key")
+
+        keyDecryptWorkspace.cancelCurrentTask()
+
+        let manualPrivateKey = "AGE-SECRET-KEY-1ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+        let manualDecryptWorkspace = WorkspaceStore(appStore: historyStore)
+        manualDecryptWorkspace.addDecryptFiles([historySupportURL.appendingPathComponent("manual.age")])
+        manualDecryptWorkspace.decryptAuthMode = .key
+        manualDecryptWorkspace.selectedDecryptKeyID = nil
+        manualDecryptWorkspace.privateKeyInput = manualPrivateKey
+        manualDecryptWorkspace.startDecrypt()
+
+        guard let manualRecord = historyStore.operations.first else {
+            check(false, "starting manual key decryption should create a history record")
+            return
+        }
+        check(manualRecord.details?.keyHint?.name == nil, "manual private key should not invent a key name")
+        check(manualRecord.details?.keyHint?.privateKeyFingerprint?.isEmpty == false, "manual private key should keep only a fingerprint hint")
+        let manualJSON = String(data: try! JSONEncoder().encode(manualRecord), encoding: .utf8)!
+        check(!manualJSON.contains("AGE-SECRET-KEY"), "manual private key history should not persist private key material")
+        check(!manualJSON.contains(manualPrivateKey), "manual private key history should not persist the full private key")
+
+        manualDecryptWorkspace.cancelCurrentTask()
+
         print("Workspace checks passed")
     }
 }

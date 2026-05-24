@@ -6,11 +6,11 @@ See LICENSE for details.
 
 # Age Mac Privacy Policy
 
-Effective date: May 21, 2026
+Effective date: May 24, 2026
 
 Age Mac is local-first. It does not upload your files, keys, passphrases, telemetry, analytics, or operation history.
 
-The app processes selected files, local settings, operation history, and age keys on your Mac. Saved private keys remain local in the macOS Keychain, and viewing or exporting them requires local macOS authentication.
+The app processes selected files, local settings, operation history, and age keys on your Mac. Operation history may include file names, output paths, status, timestamps, compression settings, duplicate-file behavior, key names, truncated public-key previews, and short private-key fingerprints. Saved private keys remain local in the macOS Keychain, viewing or exporting them requires local macOS authentication, and history does not store passphrases or private key material.
 
 Age Mac uses Sparkle for update checks. Sparkle fetches public update metadata from:
 
@@ -30,11 +30,11 @@ Repository: [github.com/vikiea/age_mac](https://github.com/vikiea/age_mac)
 
 # Age Mac 隐私政策
 
-生效日期：2026 年 5 月 21 日
+生效日期：2026 年 5 月 24 日
 
 Age Mac 是本地优先的应用。它不会上传你的文件、密钥、密码、遥测数据、分析数据或操作历史。
 
-应用只在本机处理你选择的文件、本地设置、操作历史和 age 密钥。已保存私钥保留在 macOS Keychain 中，查看或导出私钥需要本机 macOS 验证。
+应用只在本机处理你选择的文件、本地设置、操作历史和 age 密钥。操作历史可能包含文件名、输出路径、状态、时间、压缩设置、同名文件策略、密钥名称、公钥截断提示和短私钥指纹。已保存私钥保留在 macOS Keychain 中，查看或导出私钥需要本机 macOS 验证，历史记录不会保存密码或私钥内容。
 
 Age Mac 使用 Sparkle 检测更新。Sparkle 会读取以下公开更新元数据：
 

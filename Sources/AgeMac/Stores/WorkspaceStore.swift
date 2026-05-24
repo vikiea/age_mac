@@ -5,6 +5,7 @@
  */
 
 import AppKit
+import CryptoKit
 import Foundation
 
 @MainActor
@@ -158,6 +159,7 @@ final class WorkspaceStore: ObservableObject {
         let secret: String
         let recipientInfo: String
         let authArgument: String
+        let keyHint: OperationKeyHint?
         switch encryptAuthMode {
         case .passphrase:
             guard !encryptPassphrase.isEmpty else {
@@ -167,15 +169,23 @@ final class WorkspaceStore: ObservableObject {
             secret = encryptPassphrase
             recipientInfo = strings.passphrase
             authArgument = "passphrase"
+            keyHint = nil
         case .key:
-            let key = selectedEncryptKey?.publicKey ?? publicKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let keyEntry = selectedEncryptKey
+            let key = keyEntry?.publicKey ?? publicKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else {
                 alertMessage = strings.requirePublicKey()
                 return
             }
             secret = key
-            recipientInfo = key.prefix(24) + "..."
+            let preview = Self.previewKey(key)
+            recipientInfo = preview
             authArgument = "publicKey"
+            keyHint = OperationKeyHint(
+                name: keyEntry?.name,
+                publicKeyPreview: preview,
+                privateKeyFingerprint: nil
+            )
         }
 
         let settings = appStore.settings
@@ -200,7 +210,17 @@ final class WorkspaceStore: ObservableObject {
                 concurrency: settings.concurrency,
                 language: settings.language
             ),
-            recipientInfo: String(recipientInfo)
+            recipientInfo: String(recipientInfo),
+            details: OperationDetails(
+                authMethod: encryptAuthMode == .passphrase ? .passphrase : .publicKey,
+                keyHint: keyHint,
+                encryptionMode: encryptMode,
+                compression: settings.compressEnabled ? .enabled : .disabled,
+                duplicateStrategy: settings.duplicateStrategy,
+                concurrency: settings.concurrency,
+                inputCount: encryptFiles.count,
+                outputDirectory: settings.outputDirectory
+            )
         )
     }
 
@@ -216,6 +236,7 @@ final class WorkspaceStore: ObservableObject {
         let secret: String
         let recipientInfo: String
         let authArgument: String
+        let keyHint: OperationKeyHint?
         switch decryptAuthMode {
         case .passphrase:
             guard !decryptPassphrase.isEmpty else {
@@ -225,14 +246,21 @@ final class WorkspaceStore: ObservableObject {
             secret = decryptPassphrase
             recipientInfo = strings.passphrase
             authArgument = "passphrase"
+            keyHint = nil
         case .key:
-            let key = selectedDecryptKey.flatMap(appStore.privateKey(for:)) ?? privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            let keyEntry = selectedDecryptKey
+            let key = keyEntry.flatMap(appStore.privateKey(for:)) ?? privateKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !key.isEmpty else {
                 alertMessage = strings.requirePrivateKey()
                 return
             }
             secret = key
-            recipientInfo = strings.privateKey
+            keyHint = OperationKeyHint(
+                name: keyEntry?.name,
+                publicKeyPreview: keyEntry.map { Self.previewKey($0.publicKey) },
+                privateKeyFingerprint: keyEntry == nil ? Self.privateKeyFingerprint(key) : nil
+            )
+            recipientInfo = keyHint?.displayText ?? strings.privateKey
             authArgument = "privateKey"
         }
 
@@ -252,7 +280,17 @@ final class WorkspaceStore: ObservableObject {
                 concurrency: settings.concurrency,
                 language: settings.language
             ),
-            recipientInfo: recipientInfo
+            recipientInfo: recipientInfo,
+            details: OperationDetails(
+                authMethod: decryptAuthMode == .passphrase ? .passphrase : .privateKey,
+                keyHint: keyHint,
+                encryptionMode: nil,
+                compression: .notApplicable,
+                duplicateStrategy: settings.duplicateStrategy,
+                concurrency: settings.concurrency,
+                inputCount: decryptFiles.count,
+                outputDirectory: settings.outputDirectory
+            )
         )
     }
 
@@ -278,7 +316,8 @@ final class WorkspaceStore: ObservableObject {
         title: String,
         files: [SelectedFile],
         request: EngineRequest,
-        recipientInfo: String
+        recipientInfo: String,
+        details: OperationDetails
     ) {
         guard let appStore else { return }
         let recordID = UUID()
@@ -292,7 +331,8 @@ final class WorkspaceStore: ObservableObject {
             status: .running,
             errorMessage: nil,
             outputs: [],
-            timestamp: Date()
+            timestamp: Date(),
+            details: details
         )
 
         appStore.addOperation(record)
@@ -432,5 +472,17 @@ final class WorkspaceStore: ObservableObject {
     private func task(for kind: OperationKind) -> RunningOperation? {
         guard let currentTask, currentTask.kind == kind else { return nil }
         return currentTask
+    }
+
+    private static func previewKey(_ key: String) -> String {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 18 else { return trimmed }
+        return "\(trimmed.prefix(10))...\(trimmed.suffix(8))"
+    }
+
+    private static func privateKeyFingerprint(_ privateKey: String) -> String {
+        let digest = SHA256.hash(data: Data(privateKey.utf8))
+        let prefix = digest.prefix(6).map { String(format: "%02x", $0) }.joined()
+        return "SHA256:\(prefix)"
     }
 }

@@ -236,6 +236,93 @@ enum OperationStatus: String, Codable {
     }
 }
 
+enum OperationAuthMethod: String, Codable, Hashable {
+    case passphrase
+    case publicKey
+    case privateKey
+
+    func title(in language: AppLanguage) -> String {
+        switch self {
+        case .passphrase: language == .english ? "Passphrase" : "密码"
+        case .publicKey: language == .english ? "Public key" : "公钥"
+        case .privateKey: language == .english ? "Private key" : "私钥"
+        }
+    }
+}
+
+enum OperationCompression: String, Codable, Hashable {
+    case enabled
+    case disabled
+    case notApplicable
+
+    func title(in language: AppLanguage) -> String {
+        switch self {
+        case .enabled: language == .english ? "Compressed" : "已压缩"
+        case .disabled: language == .english ? "No compression" : "未压缩"
+        case .notApplicable: language == .english ? "Auto extract" : "自动解包"
+        }
+    }
+}
+
+struct OperationDetails: Codable, Hashable {
+    var authMethod: OperationAuthMethod
+    var keyHint: OperationKeyHint?
+    var encryptionMode: EncryptionMode?
+    var compression: OperationCompression
+    var duplicateStrategy: DuplicateStrategy
+    var concurrency: Int
+    var inputCount: Int
+    var outputDirectory: String
+
+    func summaryItems(in language: AppLanguage) -> [String] {
+        var items = [authSummary(in: language)]
+        if let encryptionMode {
+            items.append(encryptionMode.title(in: language))
+        }
+        items.append(compression.title(in: language))
+        items.append(language == .english ? "Concurrency \(concurrency)" : "并发 \(concurrency)")
+        items.append(duplicateStrategy.title(in: language))
+        return items
+    }
+
+    private func authSummary(in language: AppLanguage) -> String {
+        let title = authMethod.title(in: language)
+        guard let keyHint, let detail = keyHint.displayText else {
+            return title
+        }
+        return "\(title): \(detail)"
+    }
+}
+
+struct OperationKeyHint: Codable, Hashable {
+    var name: String?
+    var publicKeyPreview: String?
+    var privateKeyFingerprint: String?
+
+    var displayText: String? {
+        let cleanName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPublicKeyPreview = publicKeyPreview?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPrivateKeyFingerprint = privateKeyFingerprint?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let cleanName, !cleanName.isEmpty {
+            if let cleanPublicKeyPreview, !cleanPublicKeyPreview.isEmpty {
+                return "\(cleanName) (\(cleanPublicKeyPreview))"
+            }
+            if let cleanPrivateKeyFingerprint, !cleanPrivateKeyFingerprint.isEmpty {
+                return "\(cleanName) (\(cleanPrivateKeyFingerprint))"
+            }
+            return cleanName
+        }
+        if let cleanPublicKeyPreview, !cleanPublicKeyPreview.isEmpty {
+            return cleanPublicKeyPreview
+        }
+        if let cleanPrivateKeyFingerprint, !cleanPrivateKeyFingerprint.isEmpty {
+            return cleanPrivateKeyFingerprint
+        }
+        return nil
+    }
+}
+
 struct SelectedFile: Identifiable, Codable, Hashable {
     var id: UUID
     var path: String
@@ -336,6 +423,62 @@ struct OperationRecord: Identifiable, Codable, Hashable {
     var errorMessage: String?
     var outputs: [String]
     var timestamp: Date
+    var details: OperationDetails?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case modeLabel
+        case inputFiles
+        case outputPath
+        case recipientInfo
+        case status
+        case errorMessage
+        case outputs
+        case timestamp
+        case details
+    }
+
+    init(
+        id: UUID,
+        kind: OperationKind,
+        modeLabel: String,
+        inputFiles: [String],
+        outputPath: String,
+        recipientInfo: String,
+        status: OperationStatus,
+        errorMessage: String?,
+        outputs: [String],
+        timestamp: Date,
+        details: OperationDetails? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.modeLabel = modeLabel
+        self.inputFiles = inputFiles
+        self.outputPath = outputPath
+        self.recipientInfo = recipientInfo
+        self.status = status
+        self.errorMessage = errorMessage
+        self.outputs = outputs
+        self.timestamp = timestamp
+        self.details = details
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        kind = try container.decode(OperationKind.self, forKey: .kind)
+        modeLabel = try container.decode(String.self, forKey: .modeLabel)
+        inputFiles = try container.decode([String].self, forKey: .inputFiles)
+        outputPath = try container.decode(String.self, forKey: .outputPath)
+        recipientInfo = try container.decode(String.self, forKey: .recipientInfo)
+        status = try container.decode(OperationStatus.self, forKey: .status)
+        errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+        outputs = try container.decodeIfPresent([String].self, forKey: .outputs) ?? []
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        details = try container.decodeIfPresent(OperationDetails.self, forKey: .details)
+    }
 }
 
 struct AppSettings: Codable, Hashable {

@@ -18,7 +18,7 @@ Repository: [github.com/vikiea/age_mac](https://github.com/vikiea/age_mac)
 - Use passphrases or X25519 age keys.
 - Generate, import, rename, view, and export local age keys.
 - Import existing keys from `~/.config/age` on launch.
-- Keep operation history, outputs, and task progress local.
+- Keep detailed operation history, output links, task progress, and safe key hints local.
 - Check for app updates with Sparkle through the public GitHub Pages appcast.
 
 ## Architecture
@@ -39,7 +39,7 @@ The Swift app owns UI, local state, AppKit panels, and task orchestration. The G
 
 ## Privacy Model
 
-Age Mac is local-first. Files, passphrases, private keys, and operation history are processed and stored only on this Mac. The app does not upload files, telemetry, keys, or usage history.
+Age Mac is local-first. Files, passphrases, private keys, and operation history are processed and stored only on this Mac. History can include key names, truncated public-key previews, and private-key fingerprints for recall, but it does not store passphrases or private key material. The app does not upload files, telemetry, keys, or usage history.
 
 When update checking is enabled or triggered, Sparkle reads public update metadata from:
 

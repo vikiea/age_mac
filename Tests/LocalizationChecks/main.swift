@@ -29,11 +29,54 @@ let olderSettingsJSON = """
 """
 
 let decodedSettings = try JSONDecoder().decode(AppSettings.self, from: Data(olderSettingsJSON.utf8))
+let legacyOperationJSON = """
+{
+  "id": "\(UUID().uuidString)",
+  "kind": "encrypt",
+  "modeLabel": "Batch",
+  "inputFiles": ["secret.txt"],
+  "outputPath": "/tmp",
+  "recipientInfo": "Passphrase",
+  "status": "success",
+  "outputs": ["/tmp/secret.tar.age"],
+  "timestamp": 1
+}
+"""
+let decodedLegacyOperation = try JSONDecoder().decode(OperationRecord.self, from: Data(legacyOperationJSON.utf8))
+let detailedOperation = OperationRecord(
+    id: UUID(),
+    kind: .encrypt,
+    modeLabel: "Batch",
+    inputFiles: ["secret.txt"],
+    outputPath: "/tmp",
+    recipientInfo: "age1publickeyprefix...",
+    status: .success,
+    errorMessage: nil,
+    outputs: ["/tmp/secret.tar.age"],
+    timestamp: Date(timeIntervalSince1970: 1),
+    details: OperationDetails(
+        authMethod: .publicKey,
+        keyHint: OperationKeyHint(name: "Work key", publicKeyPreview: "age1public...prefix", privateKeyFingerprint: nil),
+        encryptionMode: .batchPack,
+        compression: .disabled,
+        duplicateStrategy: .rename,
+        concurrency: 4,
+        inputCount: 1,
+        outputDirectory: "/tmp"
+    )
+)
+let encodedDetailedOperation = try JSONEncoder().encode(detailedOperation)
+let encodedDetailedOperationText = String(data: encodedDetailedOperation, encoding: .utf8) ?? ""
 
 check(AppSettings.defaults().language == .english, "defaults should use English")
 check(AppSettings.defaults().appearance == .system, "defaults should follow system appearance")
 check(decodedSettings.language == .english, "older settings should decode with English fallback")
 check(decodedSettings.appearance == .system, "older settings should decode with system appearance fallback")
+check(decodedLegacyOperation.details == nil, "older operation records should decode without details")
+check(detailedOperation.details?.summaryItems(in: .english) == ["Public key: Work key (age1public...prefix)", "Batch", "No compression", "Concurrency 4", "Auto rename"], "English operation detail summary")
+check(detailedOperation.details?.summaryItems(in: .chinese) == ["公钥: Work key (age1public...prefix)", "打包", "未压缩", "并发 4", "自动重命名"], "Chinese operation detail summary")
+check(!encodedDetailedOperationText.contains("AGE-SECRET-KEY"), "operation details should not encode private key material")
+check(!encodedDetailedOperationText.contains("passphrase"), "operation details should not encode passphrases")
 check(AppLanguage.english.title == "English", "English language label")
 check(AppLanguage.chinese.title == "中文", "Chinese language label")
 check(AppAppearance.system.title(in: .english) == "System", "English system appearance label")
@@ -107,7 +150,8 @@ let legacyOperations = (0..<250).map { index in
         status: .success,
         errorMessage: nil,
         outputs: ["/tmp/file-\(index).age"],
-        timestamp: Date(timeIntervalSince1970: Double(index))
+        timestamp: Date(timeIntervalSince1970: Double(index)),
+        details: nil
     )
 }
 let legacyStateJSON = """
