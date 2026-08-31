@@ -67,15 +67,18 @@ Age Mac imports existing age key files from:
 ~/.config/age
 ```
 
-The importer supports age key files with or without file extensions. It understands the standard `age-keygen` format:
+The importer supports post-quantum and classic age key files with or without file extensions. It understands the standard `age-keygen` formats:
 
 ```text
 # created: 2026-05-18T00:00:00Z
+# public key: age1pq1...
+AGE-SECRET-KEY-PQ-1...
+
 # public key: age1...
-AGE-SECRET-KEY-...
+AGE-SECRET-KEY-1...
 ```
 
-Manual import and file import are also available in the app's Keys tab.
+The primary Generate Key action creates a hybrid ML-KEM-768 + X25519 post-quantum key. Classic X25519 generation remains available as an explicit compatibility action. Manual import and file import are also available in the app's Keys tab.
 
 ## Sparkle Key Pair
 

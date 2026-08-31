@@ -90,12 +90,18 @@ struct AgeMacApp: App {
             }
 
             CommandMenu("Age") {
-                Button(strings.generateKey) {
+                Button(strings.generatePostQuantumKey) {
                     commandWorkspace?.selectedSection = .keys
-                    commandWorkspace?.generateKeyPair()
+                    commandWorkspace?.generateKeyPair(type: .postQuantum)
                 }
                 .disabled(commandWorkspace == nil)
                 .keyboardShortcut("k", modifiers: [.command, .shift])
+
+                Button(strings.generateClassicX25519Key) {
+                    commandWorkspace?.selectedSection = .keys
+                    commandWorkspace?.generateKeyPair(type: .x25519)
+                }
+                .disabled(commandWorkspace == nil)
 
                 Button(strings.chooseOutputDirectory) {
                     commandWorkspace?.selectedSection = .settings

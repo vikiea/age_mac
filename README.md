@@ -15,8 +15,9 @@ Repository: [github.com/vikiea/age_mac](https://github.com/vikiea/age_mac)
 - Encrypt multiple files into one `.tar.gz.age` or `.tar.age` archive.
 - Encrypt files separately, one age archive per input file.
 - Decrypt `.age` files and automatically unpack tar or tar.gz payloads.
-- Use passphrases or X25519 age keys.
-- Generate, import, rename, view, and export local age keys.
+- Use passphrases, post-quantum hybrid ML-KEM-768 + X25519 age keys, or classic X25519 age keys.
+- Generate post-quantum keys by default, with explicit classic X25519 generation for compatibility.
+- Import, rename, view, and export both post-quantum and classic local age keys.
 - Import existing keys from `~/.config/age` on launch.
 - Keep detailed operation history, output links, task progress, and safe key hints local.
 - Check for app updates with Sparkle through the public GitHub Pages appcast.
@@ -88,6 +89,8 @@ codesign --verify --deep --strict --verbose=2 dist/AgeMac.app
 ```
 
 Use `env -u GOROOT` for Go commands if your shell has a stale `GOROOT` from another installation.
+
+The engine uses `filippo.io/age` v1.3.1. Its post-quantum key support is native to the age library: recipients start with `age1pq1`, identities start with `AGE-SECRET-KEY-PQ-1`, and encrypted files use the `mlkem768x25519` recipient stanza.
 
 ## Release And Updates
 

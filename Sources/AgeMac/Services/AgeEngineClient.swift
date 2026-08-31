@@ -139,7 +139,7 @@ final class AgeEngineClient {
         return cwd.appendingPathComponent("Engine/age-engine")
     }
 
-    func generateKeyPair(language: AppLanguage) throws -> KeyEntry {
+    func generateKeyPair(type: AgeKeyType = .recommended, language: AppLanguage) throws -> KeyEntry {
         let engine = engineURL
         guard FileManager.default.isExecutableFile(atPath: engine.path) else {
             throw EngineClientError.engineMissing(engine)
@@ -149,7 +149,7 @@ final class AgeEngineClient {
         let stdout = Pipe()
         let stderr = Pipe()
         process.executableURL = engine
-        process.arguments = ["keygen"]
+        process.arguments = ["keygen", "--type", type.engineValue]
         process.standardOutput = stdout
         process.standardError = stderr
         try process.run()
@@ -165,7 +165,13 @@ final class AgeEngineClient {
               let privateKey = event.privateKey else {
             throw EngineClientError.invalidKeygenOutput
         }
-        return KeyEntry(id: UUID(), name: "age key \(Date().formatted(date: .numeric, time: .shortened))", publicKey: publicKey, privateKey: privateKey, createdAt: Date())
+        return KeyEntry(
+            id: UUID(),
+            name: "\(type.title(in: language)) key \(Date().formatted(date: .numeric, time: .shortened))",
+            publicKey: publicKey,
+            privateKey: privateKey,
+            createdAt: Date()
+        )
     }
 
     func run(

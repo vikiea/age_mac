@@ -85,6 +85,11 @@ check(AppAppearance.dark.title(in: .english) == "Dark", "English dark appearance
 check(AppAppearance.dark.title(in: .chinese) == "深色", "Chinese dark appearance label")
 check(AppSection.encrypt.title(in: .english) == "Encrypt", "English section title")
 check(AppSection.encrypt.title(in: .chinese) == "加密", "Chinese section title")
+check(AgeKeyType.recommended == .postQuantum, "post-quantum keys should be the recommended default")
+check(AgeKeyType.postQuantum.engineValue == "post-quantum", "post-quantum engine argument")
+check(AgeKeyType.x25519.engineValue == "x25519", "X25519 engine argument")
+check(AgeKeyType.postQuantum.title(in: .english).contains("ML-KEM-768"), "English post-quantum key label")
+check(AgeKeyType.postQuantum.title(in: .chinese).contains("后量子"), "Chinese post-quantum key label")
 check(OperationStatus.running.title(in: .english) == "Running", "English status title")
 check(OperationStatus.running.title(in: .chinese) == "运行中", "Chinese status title")
 check(AppStrings(language: .english).newAgeMacWindow == "New Age Mac Window", "English new window menu text")
@@ -102,6 +107,25 @@ check(AppStrings(language: .english).settingsLanguageSubtitle == "Interface lang
 check(AppStrings(language: .chinese).settingsLanguageSubtitle == "界面语言", "Chinese settings subtitle")
 check(AppStrings(language: .english).requireEncryptPassphrase() == "Enter an encryption passphrase", "English validation text")
 check(AppStrings(language: .chinese).requireEncryptPassphrase() == "请输入加密密码", "Chinese validation text")
+
+let postQuantumKeyFile = """
+# created: 2026-08-29T00:00:00Z
+# public key: age1pq1example
+AGE-SECRET-KEY-PQ-1EXAMPLE
+"""
+let parsedPostQuantumKey = try KeyFileCodec.parse(postQuantumKeyFile, fallbackName: "Post-quantum import")
+check(parsedPostQuantumKey.publicKey == "age1pq1example", "post-quantum public key import")
+check(parsedPostQuantumKey.privateKey == "AGE-SECRET-KEY-PQ-1EXAMPLE", "post-quantum private key import")
+check(parsedPostQuantumKey.keyType == .postQuantum, "post-quantum key type detection")
+
+let classicKey = KeyEntry(
+    id: UUID(),
+    name: "Classic",
+    publicKey: "age1classic",
+    privateKey: nil,
+    createdAt: Date(timeIntervalSince1970: 1)
+)
+check(classicKey.keyType == .x25519, "classic X25519 key type detection")
 
 let sensitiveKey = KeyEntry(
     id: UUID(),

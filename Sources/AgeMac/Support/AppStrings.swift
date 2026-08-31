@@ -37,7 +37,8 @@ struct AppStrings {
     var exportKeyHelp: String { text(en: "Authenticate to export key", zh: "验证后导出密钥") }
     var gaussianOpacity: String { text(en: "Opacity", zh: "透明度") }
     var gaussianTransparency: String { text(en: "Gaussian transparency", zh: "高斯透明") }
-    var generateKey: String { text(en: "Generate Key", zh: "生成密钥") }
+    var generatePostQuantumKey: String { text(en: "Generate Post-Quantum Key", zh: "生成后量子密钥") }
+    var generateClassicX25519Key: String { text(en: "Generate Classic X25519 Key", zh: "生成经典 X25519 密钥") }
     var hasPrivateKey: String { text(en: "Private key saved", zh: "含私钥") }
     var historyTitle: String { text(en: "Operation History", zh: "操作记录") }
     var historySubtitle: String { text(en: "Review local encryption and decryption operations", zh: "查看本机加密和解密操作记录") }
@@ -47,7 +48,7 @@ struct AppStrings {
     var interface: String { text(en: "Interface", zh: "界面") }
     var keyName: String { text(en: "Key name", zh: "密钥名称") }
     var keysTitle: String { text(en: "Saved Keys", zh: "已保存密钥") }
-    var keysSubtitle: String { text(en: "Generate, import, and manage local X25519 age keys", zh: "生成、导入并管理本地 X25519 age 密钥") }
+    var keysSubtitle: String { text(en: "Generate recommended post-quantum keys or use classic X25519 keys", zh: "生成推荐的后量子密钥，或继续使用经典 X25519 密钥") }
     var languageLabel: String { text(en: "Language", zh: "语言") }
     var manualImport: String { text(en: "Manual Import", zh: "手动导入") }
     var noFilesTitle: String { text(en: "No Files", zh: "没有文件") }
@@ -87,7 +88,7 @@ struct AppStrings {
     }
 
     func ageLibraryPurpose() -> String {
-        text(en: "age encryption format and X25519 support", zh: "age 加密格式与 X25519 支持")
+        text(en: "age encryption format with post-quantum and X25519 key support", zh: "支持后量子与 X25519 密钥的 age 加密格式")
     }
 
     func appleUIPurpose() -> String {

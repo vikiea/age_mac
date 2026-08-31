@@ -122,9 +122,9 @@ final class WorkspaceStore: ObservableObject {
         decryptFiles.removeAll()
     }
 
-    func generateKeyPair() {
+    func generateKeyPair(type: AgeKeyType = .recommended) {
         Task {
-            guard let key = await appStore?.generateKeyPairForWorkspace() else { return }
+            guard let key = await appStore?.generateKeyPairForWorkspace(type: type) else { return }
             selectedEncryptKeyID = key.id
             selectedDecryptKeyID = key.id
         }

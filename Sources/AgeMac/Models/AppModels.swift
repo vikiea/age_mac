@@ -83,7 +83,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .encrypt: language == .english ? "Batch or separate encryption" : "打包或分别加密"
         case .decrypt: language == .english ? "Decrypt and auto-extract" : "解密并自动解包"
-        case .keys: language == .english ? "X25519 keys" : "X25519 密钥"
+        case .keys: language == .english ? "Post-quantum and X25519 keys" : "后量子与 X25519 密钥"
         case .history: language == .english ? "Local operation history" : "本地操作记录"
         case .settings: language == .english ? "Output and tasks" : "输出与任务"
         }
@@ -143,6 +143,31 @@ enum AuthMode: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .passphrase: language == .english ? "Passphrase" : "密码"
         case .key: language == .english ? "Key" : "密钥"
+        }
+    }
+}
+
+enum AgeKeyType: String, CaseIterable, Identifiable {
+    case postQuantum
+    case x25519
+
+    static let recommended: AgeKeyType = .postQuantum
+
+    var id: String { rawValue }
+
+    var engineValue: String {
+        switch self {
+        case .postQuantum: "post-quantum"
+        case .x25519: "x25519"
+        }
+    }
+
+    func title(in language: AppLanguage) -> String {
+        switch self {
+        case .postQuantum:
+            language == .english ? "Post-quantum (ML-KEM-768 + X25519)" : "后量子（ML-KEM-768 + X25519）"
+        case .x25519:
+            language == .english ? "Classic X25519" : "经典 X25519"
         }
     }
 }
@@ -399,6 +424,16 @@ struct KeyEntry: Identifiable, Codable, Hashable {
     }
 
     var hasPrivateKey: Bool { privateKeyStored || privateKey?.isEmpty == false }
+
+    var keyType: AgeKeyType? {
+        if publicKey.hasPrefix("age1pq1") {
+            return .postQuantum
+        }
+        if publicKey.hasPrefix("age1") {
+            return .x25519
+        }
+        return nil
+    }
 
     func withPrivateKey(_ privateKey: String?, privateKeyStored: Bool? = nil) -> KeyEntry {
         KeyEntry(

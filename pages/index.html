@@ -1207,7 +1207,7 @@ See LICENSE for details.
           <article class="feature-card">
             <span class="caption">01</span>
             <h3 data-i18n="features.cards.encrypt.title">Batch encryption</h3>
-            <p data-i18n="features.cards.encrypt.body">Combine selected files into one archive or encrypt each file separately with passphrases or X25519 recipients.</p>
+            <p data-i18n="features.cards.encrypt.body">Combine selected files into one archive or encrypt each file separately with passphrases, post-quantum keys, or classic X25519 recipients.</p>
           </article>
           <article class="feature-card">
             <span class="caption">02</span>
@@ -1217,7 +1217,7 @@ See LICENSE for details.
           <article class="feature-card">
             <span class="caption">03</span>
             <h3 data-i18n="features.cards.keys.title">Local key management</h3>
-            <p data-i18n="features.cards.keys.body">Generate, import, rename, view, and export age keys. Private key material is stored in the macOS Keychain.</p>
+            <p data-i18n="features.cards.keys.body">Generate recommended ML-KEM-768 + X25519 post-quantum keys or classic X25519 keys. Private key material is stored in the macOS Keychain.</p>
           </article>
           <article class="feature-card">
             <span class="caption">04</span>
@@ -1456,7 +1456,7 @@ See LICENSE for details.
           cards: {
             encrypt: {
               title: "Batch encryption",
-              body: "Combine selected files into one archive or encrypt each file separately with passphrases or X25519 recipients."
+              body: "Combine selected files into one archive or encrypt each file separately with passphrases, post-quantum keys, or classic X25519 recipients."
             },
             decrypt: {
               title: "Archive-aware decrypt",
@@ -1464,7 +1464,7 @@ See LICENSE for details.
             },
             keys: {
               title: "Local key management",
-              body: "Generate, import, rename, view, and export age keys. Private key material is stored in the macOS Keychain."
+              body: "Generate recommended ML-KEM-768 + X25519 post-quantum keys or classic X25519 keys. Private key material is stored in the macOS Keychain."
             },
             tasks: {
               title: "Long task feedback",
@@ -1523,7 +1523,7 @@ See LICENSE for details.
           },
           keys: {
             title: "Keys",
-            body: "Generate, import, rename, view, and export local age keys.",
+            body: "Generate recommended post-quantum keys or classic X25519 keys, then import, rename, view, and export them.",
             alt: "Age Mac keys screen showing saved keys and manual import"
           },
           history: {
@@ -1584,7 +1584,7 @@ See LICENSE for details.
           cards: {
             encrypt: {
               title: "批量加密",
-              body: "多个文件可以合成为一个归档，也可以按文件分别输出；支持密码和 X25519 公钥接收者。"
+              body: "多个文件可以合成为一个归档，也可以按文件分别输出；支持密码、后量子密钥和经典 X25519 公钥接收者。"
             },
             decrypt: {
               title: "识别归档的解密",
@@ -1592,7 +1592,7 @@ See LICENSE for details.
             },
             keys: {
               title: "本地密钥管理",
-              body: "生成、导入、重命名、查看和导出 age 密钥；私钥内容存储在 macOS Keychain 中。"
+              body: "默认生成推荐的 ML-KEM-768 + X25519 后量子密钥，也可生成经典 X25519 密钥；私钥内容存储在 macOS Keychain 中。"
             },
             tasks: {
               title: "长期任务反馈",
@@ -1651,7 +1651,7 @@ See LICENSE for details.
           },
           keys: {
             title: "密钥",
-            body: "生成、导入、重命名、查看和导出本地 age 密钥。",
+            body: "生成推荐的后量子密钥或经典 X25519 密钥，并在本地导入、重命名、查看和导出。",
             alt: "Age Mac 密钥页，展示已保存密钥和手动导入"
           },
           history: {

@@ -124,6 +124,15 @@ func TestEncryptDefaultsDisableCompression(t *testing.T) {
 }
 
 func TestEncryptBatchKeyPairRoundTrip(t *testing.T) {
+	testEncryptBatchKeyPairRoundTrip(t, "x25519")
+}
+
+func TestEncryptBatchPostQuantumKeyPairRoundTrip(t *testing.T) {
+	testEncryptBatchKeyPairRoundTrip(t, "post-quantum")
+}
+
+func testEncryptBatchKeyPairRoundTrip(t *testing.T, keyType string) {
+	t.Helper()
 	tempDir := t.TempDir()
 	inputDir := filepath.Join(tempDir, "input")
 	outputDir := filepath.Join(tempDir, "output")
@@ -135,16 +144,16 @@ func TestEncryptBatchKeyPairRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	identity, err := age.GenerateX25519Identity()
+	publicKey, privateKey, err := generateKeyPair(keyType)
 	if err != nil {
 		t.Fatal(err)
 	}
 	publicFile := filepath.Join(tempDir, "public.txt")
 	privateFile := filepath.Join(tempDir, "private.txt")
-	if err := os.WriteFile(publicFile, []byte(identity.Recipient().String()), 0600); err != nil {
+	if err := os.WriteFile(publicFile, []byte(publicKey), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(privateFile, []byte(identity.String()), 0600); err != nil {
+	if err := os.WriteFile(privateFile, []byte(privateKey), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -179,6 +188,40 @@ func TestEncryptBatchKeyPairRoundTrip(t *testing.T) {
 	}
 	if string(decrypted) != "hello key pair mode\n" {
 		t.Fatalf("decrypted content mismatch: %q", string(decrypted))
+	}
+}
+
+func TestGenerateKeyPairPrefixes(t *testing.T) {
+	if defaultKeyType != "post-quantum" {
+		t.Fatalf("default key type = %q, want post-quantum", defaultKeyType)
+	}
+
+	postQuantumPublic, postQuantumPrivate, err := generateKeyPair("post-quantum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(postQuantumPublic, "age1pq1") {
+		t.Fatalf("post-quantum public key has unexpected prefix: %q", postQuantumPublic)
+	}
+	if !strings.HasPrefix(postQuantumPrivate, "AGE-SECRET-KEY-PQ-1") {
+		t.Fatalf("post-quantum private key has unexpected prefix: %q", postQuantumPrivate)
+	}
+
+	x25519Public, x25519Private, err := generateKeyPair("x25519")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(x25519Public, "age1") || strings.HasPrefix(x25519Public, "age1pq1") {
+		t.Fatalf("X25519 public key has unexpected prefix: %q", x25519Public)
+	}
+	if !strings.HasPrefix(x25519Private, "AGE-SECRET-KEY-1") {
+		t.Fatalf("X25519 private key has unexpected prefix: %q", x25519Private)
+	}
+}
+
+func TestGenerateKeyPairRejectsUnknownType(t *testing.T) {
+	if _, _, err := generateKeyPair("rsa"); err == nil {
+		t.Fatal("generateKeyPair should reject unknown key types")
 	}
 }
 

@@ -39,11 +39,11 @@ final class AppStore: ObservableObject {
         saveSettings()
     }
 
-    func generateKeyPairForWorkspace() async -> KeyEntry? {
+    func generateKeyPairForWorkspace(type: AgeKeyType = .recommended) async -> KeyEntry? {
         let language = settings.language
         do {
             let key = try await Task.detached {
-                try AgeEngineClient().generateKeyPair(language: language)
+                try AgeEngineClient().generateKeyPair(type: type, language: language)
             }.value
             let storedKey = storePrivateKeyIfNeeded(for: key)
             keys.insert(storedKey, at: 0)

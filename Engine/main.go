@@ -26,7 +26,10 @@ import (
 	"filippo.io/age/armor"
 )
 
-const maxConcurrency = 12
+const (
+	maxConcurrency = 12
+	defaultKeyType = "post-quantum"
+)
 
 var emitMu sync.Mutex
 var outputPathMu sync.Mutex
@@ -57,7 +60,7 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "keygen":
-		err = keygen()
+		err = keygen(os.Args[2:])
 	case "encrypt-batch":
 		err = encryptBatch(os.Args[2:])
 	case "encrypt-separate":
@@ -84,19 +87,44 @@ func emit(e event) {
 	fmt.Println(string(data))
 }
 
-func keygen() error {
-	identity, err := age.GenerateX25519Identity()
+func keygen(args []string) error {
+	fs := flag.NewFlagSet("keygen", flag.ContinueOnError)
+	keyType := fs.String("type", defaultKeyType, "post-quantum or x25519")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	publicKey, privateKey, err := generateKeyPair(*keyType)
 	if err != nil {
-		return fmt.Errorf("failed to generate key pair: %w", err)
+		return err
 	}
 	payload := map[string]string{
 		"event":      "keypair",
-		"publicKey":  identity.Recipient().String(),
-		"privateKey": identity.String(),
+		"publicKey":  publicKey,
+		"privateKey": privateKey,
 	}
 	data, _ := json.Marshal(payload)
 	fmt.Println(string(data))
 	return nil
+}
+
+func generateKeyPair(keyType string) (publicKey string, privateKey string, err error) {
+	switch keyType {
+	case "post-quantum":
+		identity, err := age.GenerateHybridIdentity()
+		if err != nil {
+			return "", "", fmt.Errorf("failed to generate post-quantum key pair: %w", err)
+		}
+		return identity.Recipient().String(), identity.String(), nil
+	case "x25519":
+		identity, err := age.GenerateX25519Identity()
+		if err != nil {
+			return "", "", fmt.Errorf("failed to generate X25519 key pair: %w", err)
+		}
+		return identity.Recipient().String(), identity.String(), nil
+	default:
+		return "", "", fmt.Errorf("unsupported key type: %s", keyType)
+	}
 }
 
 func encryptBatch(args []string) error {
@@ -302,7 +330,14 @@ func recipientFor(auth string, secret string) (age.Recipient, error) {
 	case "passphrase":
 		return age.NewScryptRecipient(secret)
 	case "publicKey":
-		return age.ParseX25519Recipient(secret)
+		recipients, err := age.ParseRecipients(strings.NewReader(secret))
+		if err != nil {
+			return nil, err
+		}
+		if len(recipients) != 1 {
+			return nil, fmt.Errorf("expected exactly one public key, got %d", len(recipients))
+		}
+		return recipients[0], nil
 	default:
 		return nil, fmt.Errorf("unsupported auth mode: %s", auth)
 	}
@@ -313,7 +348,14 @@ func identityFor(auth string, secret string) (age.Identity, error) {
 	case "passphrase":
 		return age.NewScryptIdentity(secret)
 	case "privateKey":
-		return age.ParseX25519Identity(secret)
+		identities, err := age.ParseIdentities(strings.NewReader(secret))
+		if err != nil {
+			return nil, err
+		}
+		if len(identities) != 1 {
+			return nil, fmt.Errorf("expected exactly one private key, got %d", len(identities))
+		}
+		return identities[0], nil
 	default:
 		return nil, fmt.Errorf("unsupported auth mode: %s", auth)
 	}

@@ -29,10 +29,21 @@ struct KeysView: View {
                 } label: {
                     Label(strings.importFromFile, systemImage: "square.and.arrow.down")
                 }
-                Button {
-                    workspace.generateKeyPair()
+                Menu {
+                    Button {
+                        workspace.generateKeyPair(type: .postQuantum)
+                    } label: {
+                        Label(strings.generatePostQuantumKey, systemImage: "checkmark.shield.fill")
+                    }
+                    Button {
+                        workspace.generateKeyPair(type: .x25519)
+                    } label: {
+                        Label(strings.generateClassicX25519Key, systemImage: "key.horizontal")
+                    }
                 } label: {
-                    Label(strings.generateKey, systemImage: "sparkles")
+                    Label(strings.generatePostQuantumKey, systemImage: "sparkles")
+                } primaryAction: {
+                    workspace.generateKeyPair(type: .postQuantum)
                 }
             }
 
@@ -104,6 +115,11 @@ private struct KeyRowView: View {
                     Label(store.strings.hasPrivateKey, systemImage: "checkmark.seal.fill")
                         .font(.caption)
                         .foregroundStyle(.green)
+                }
+                if let keyType = key.keyType {
+                    Text(keyType.title(in: store.settings.language))
+                        .font(.caption)
+                        .foregroundStyle(keyType == .postQuantum ? Color.blue : Color.secondary)
                 }
                 actionButtons
             }
