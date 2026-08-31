@@ -21,7 +21,7 @@ The binary is installed at:
 age-mac --json doctor
 age-mac init --repo /path/to/age_mac
 age-mac --json dev verify
-age-mac --verbose --json dev package --arch all --version 1.4.0
+age-mac --verbose --json dev package --arch all --version 1.5.0
 age-mac dev run
 age-mac dev debug
 age-mac dev logs
@@ -30,10 +30,10 @@ age-mac --json repo status
 age-mac repo commit --message "chore: update release tooling"
 age-mac repo push --set-upstream
 age-mac repo pr create --title "..." --body "..."
-age-mac repo release create --version 1.4.0 --notes-file RELEASE_NOTES.md --asset pages/releases/AgeMac-1.4.0-universal.dmg
-age-mac repo release upload --version 1.4.0
-age-mac --verbose --json repo release verify --version 1.4.0
-age-mac request gh release view v1.4.0 --json tagName,assets
+age-mac repo release create --version 1.5.0 --notes-file RELEASE_NOTES.md --asset pages/releases/AgeMac-1.5.0-universal.dmg
+age-mac repo release upload --version 1.5.0
+age-mac --verbose --json repo release verify --version 1.5.0
+age-mac request gh release view v1.5.0 --json tagName,assets
 ```
 
 `dev` commands are local build and runtime operations. `repo` commands are Git/GitHub operations. `request` is a raw escape hatch that runs `gh` with the configured repository environment.

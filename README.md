@@ -90,7 +90,7 @@ codesign --verify --deep --strict --verbose=2 dist/AgeMac.app
 
 Use `env -u GOROOT` for Go commands if your shell has a stale `GOROOT` from another installation.
 
-The engine uses `filippo.io/age` v1.3.1. Its post-quantum key support is native to the age library: recipients start with `age1pq1`, identities start with `AGE-SECRET-KEY-PQ-1`, and encrypted files use the `mlkem768x25519` recipient stanza.
+The engine uses `filippo.io/age` v1.3.1. Its native `x25519mlkem768` post-quantum hybrid key support uses recipients starting with `age1pq1`, identities starting with `AGE-SECRET-KEY-PQ-1`, and the `mlkem768x25519` recipient stanza in encrypted files.
 
 ## Release And Updates
 
